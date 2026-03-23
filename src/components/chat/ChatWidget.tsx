@@ -237,10 +237,18 @@ export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProp
                   language={language}
                   brandColor={config.brand_color}
                   onSubmit={(data) => {
+                    // 1) 세션에 저장 (admin에서 보임) — 기존 chat API 경로 사용
+                    const emailInfo = [
+                      data.name ? `Name: ${data.name}` : '',
+                      data.email ? `Email: ${data.email}` : '',
+                      data.message ? `Message: ${data.message}` : '',
+                    ].filter(Boolean).join(', ')
+                    doSendMessage(`[Email Submitted] ${emailInfo}`)
+                    // 2) Google Sheets 백업
                     fetch('/api/chat-email', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ ...data, sessionId }),
+                      body: JSON.stringify(data),
                     })
                   }}
                 />

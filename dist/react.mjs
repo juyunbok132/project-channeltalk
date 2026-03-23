@@ -350,10 +350,16 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
             language,
             brandColor: config.brand_color,
             onSubmit: (data) => {
+              const emailInfo = [
+                data.name ? `Name: ${data.name}` : "",
+                data.email ? `Email: ${data.email}` : "",
+                data.message ? `Message: ${data.message}` : ""
+              ].filter(Boolean).join(", ");
+              doSendMessage(`[Email Submitted] ${emailInfo}`);
               fetch("/api/chat-email", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(__spreadProps(__spreadValues({}, data), { sessionId }))
+                body: JSON.stringify(data)
               });
             }
           }
