@@ -65,6 +65,7 @@ var DEFAULT_CONFIG = {
     max_input_length: 500
   },
   cost_safety: {
+    model: "claude-haiku-4-5-20251001",
     monthly_budget_usd: 30,
     daily_budget_usd: 1,
     kill_switch_usd: 27,

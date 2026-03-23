@@ -108,7 +108,7 @@ export function createChatHandler(options?: ChatHandlerOptions) {
 
       // AI 호출 (prompt caching 적용)
       const result = streamText({
-        model: anthropic('claude-haiku-4-5-20241022'),
+        model: anthropic(config.cost_safety.model || 'claude-haiku-4-5-20251001'),
         system: [
           {
             role: 'system' as const,

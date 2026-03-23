@@ -1,7 +1,7 @@
 import {
   loadConfig,
   loadKnowledge
-} from "./chunk-JIOOBHXR.mjs";
+} from "./chunk-JCCFGT5R.mjs";
 
 // src/api/chat-handler.ts
 import { anthropic } from "@ai-sdk/anthropic";
@@ -279,7 +279,7 @@ function createChatHandler(options) {
         content: extractText(m) || ""
       }));
       const result = streamText({
-        model: anthropic("claude-haiku-4-5-20241022"),
+        model: anthropic(config.cost_safety.model || "claude-haiku-4-5-20251001"),
         system: [
           {
             role: "system",

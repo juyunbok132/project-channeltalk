@@ -56,6 +56,7 @@ interface LimitsConfig {
     max_input_length: number;
 }
 interface CostSafetyConfig {
+    model: string;
     monthly_budget_usd: number;
     daily_budget_usd: number;
     kill_switch_usd: number;

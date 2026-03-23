@@ -1,7 +1,7 @@
 "use strict";Object.defineProperty(exports, "__esModule", {value: true});
 
 
-var _chunkI7PQMDCOcjs = require('./chunk-I7PQMDCO.cjs');
+var _chunkV52R3QNMcjs = require('./chunk-V52R3QNM.cjs');
 
 // src/api/chat-handler.ts
 var _anthropic = require('@ai-sdk/anthropic');
@@ -210,8 +210,8 @@ async function getSessionsByFilter(filter) {
 
 // src/api/chat-handler.ts
 function createChatHandler(options) {
-  const config = _chunkI7PQMDCOcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
-  const knowledge = _chunkI7PQMDCOcjs.loadKnowledge.call(void 0, options == null ? void 0 : options.knowledgePath);
+  const config = _chunkV52R3QNMcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
+  const knowledge = _chunkV52R3QNMcjs.loadKnowledge.call(void 0, options == null ? void 0 : options.knowledgePath);
   const systemPromptText = buildSystemPrompt(config, knowledge);
   async function POST(req) {
     try {
@@ -279,7 +279,7 @@ function createChatHandler(options) {
         content: extractText(m) || ""
       }));
       const result = _ai.streamText.call(void 0, {
-        model: _anthropic.anthropic.call(void 0, "claude-haiku-4-5-20241022"),
+        model: _anthropic.anthropic.call(void 0, config.cost_safety.model || "claude-haiku-4-5-20251001"),
         system: [
           {
             role: "system",
@@ -365,7 +365,7 @@ function detectLanguage(text) {
 // src/api/config-handler.ts
 function createConfigHandler(options) {
   async function GET() {
-    const config = _chunkI7PQMDCOcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
+    const config = _chunkV52R3QNMcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
     const clientConfig = {
       bot: config.bot,
       service: { name: config.service.name },
