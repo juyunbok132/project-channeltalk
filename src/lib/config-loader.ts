@@ -82,7 +82,21 @@ export function loadConfig(configPath?: string): AppConfig {
   const raw = fs.readFileSync(resolvedPath, 'utf-8')
   const parsed = yaml.load(raw) as Record<string, unknown>
 
-  cachedConfig = deepMerge(DEFAULT_CONFIG as unknown as Record<string, unknown>, parsed) as unknown as AppConfig
+  const merged = deepMerge(DEFAULT_CONFIG as unknown as Record<string, unknown>, parsed) as unknown as AppConfig
+
+  // preset_questions (yaml) → presets (code) 변환
+  const pq = parsed.preset_questions as Record<string, string[]> | undefined
+  if (pq) {
+    const enList = pq.en || []
+    const koList = pq.ko || []
+    const maxLen = Math.max(enList.length, koList.length)
+    merged.presets = Array.from({ length: maxLen }, (_, i) => ({
+      en: enList[i] || '',
+      ko: koList[i] || '',
+    }))
+  }
+
+  cachedConfig = merged
   return cachedConfig
 }
 

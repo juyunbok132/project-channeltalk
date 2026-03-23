@@ -3,7 +3,7 @@ import {
   clearKnowledgeCache,
   loadConfig,
   loadKnowledge
-} from "./chunk-TYXARZFF.mjs";
+} from "./chunk-JIOOBHXR.mjs";
 export {
   clearConfigCache,
   clearKnowledgeCache,

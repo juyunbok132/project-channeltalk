@@ -1,4 +1,4 @@
-var __defProp = Object.defineProperty;
+"use strict";Object.defineProperty(exports, "__esModule", {value: true}); function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }var __defProp = Object.defineProperty;
 var __getOwnPropSymbols = Object.getOwnPropertySymbols;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __propIsEnum = Object.prototype.propertyIsEnumerable;
@@ -16,9 +16,9 @@ var __spreadValues = (a, b) => {
 };
 
 // src/lib/config-loader.ts
-import fs from "fs";
-import path from "path";
-import yaml from "js-yaml";
+var _fs = require('fs'); var _fs2 = _interopRequireDefault(_fs);
+var _path = require('path'); var _path2 = _interopRequireDefault(_path);
+var _jsyaml = require('js-yaml'); var _jsyaml2 = _interopRequireDefault(_jsyaml);
 var cachedConfig = null;
 var DEFAULT_CONFIG = {
   bot: {
@@ -84,20 +84,31 @@ var DEFAULT_CONFIG = {
 };
 function loadConfig(configPath) {
   if (cachedConfig) return cachedConfig;
-  const resolvedPath = configPath || path.join(
+  const resolvedPath = configPath || _path2.default.join(
     /* turbopackIgnore: true */
     process.cwd(),
     "chatbot",
     "config.yaml"
   );
-  if (!fs.existsSync(resolvedPath)) {
+  if (!_fs2.default.existsSync(resolvedPath)) {
     console.warn(`Config file not found at ${resolvedPath}, using defaults`);
     cachedConfig = DEFAULT_CONFIG;
     return cachedConfig;
   }
-  const raw = fs.readFileSync(resolvedPath, "utf-8");
-  const parsed = yaml.load(raw);
-  cachedConfig = deepMerge(DEFAULT_CONFIG, parsed);
+  const raw = _fs2.default.readFileSync(resolvedPath, "utf-8");
+  const parsed = _jsyaml2.default.load(raw);
+  const merged = deepMerge(DEFAULT_CONFIG, parsed);
+  const pq = parsed.preset_questions;
+  if (pq) {
+    const enList = pq.en || [];
+    const koList = pq.ko || [];
+    const maxLen = Math.max(enList.length, koList.length);
+    merged.presets = Array.from({ length: maxLen }, (_, i) => ({
+      en: enList[i] || "",
+      ko: koList[i] || ""
+    }));
+  }
+  cachedConfig = merged;
   return cachedConfig;
 }
 function clearConfigCache() {
@@ -119,22 +130,22 @@ function deepMerge(target, source) {
 }
 
 // src/lib/knowledge-loader.ts
-import fs2 from "fs";
-import path2 from "path";
+
+
 var cachedKnowledge = null;
 function loadKnowledge(knowledgePath) {
   if (cachedKnowledge) return cachedKnowledge;
-  const resolvedPath = knowledgePath || path2.join(
+  const resolvedPath = knowledgePath || _path2.default.join(
     /* turbopackIgnore: true */
     process.cwd(),
     "chatbot",
     "knowledge.md"
   );
-  if (!fs2.existsSync(resolvedPath)) {
+  if (!_fs2.default.existsSync(resolvedPath)) {
     console.warn(`Knowledge file not found at ${resolvedPath}`);
     return "";
   }
-  const raw = fs2.readFileSync(resolvedPath, "utf-8");
+  const raw = _fs2.default.readFileSync(resolvedPath, "utf-8");
   cachedKnowledge = parseKnowledge(raw);
   return cachedKnowledge;
 }
@@ -197,9 +208,9 @@ function parseKnowledge(raw) {
   return sections.join("\n\n");
 }
 
-export {
-  loadConfig,
-  clearConfigCache,
-  loadKnowledge,
-  clearKnowledgeCache
-};
+
+
+
+
+
+exports.loadConfig = loadConfig; exports.clearConfigCache = clearConfigCache; exports.loadKnowledge = loadKnowledge; exports.clearKnowledgeCache = clearKnowledgeCache;

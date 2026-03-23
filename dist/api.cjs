@@ -1,7 +1,7 @@
 "use strict";Object.defineProperty(exports, "__esModule", {value: true});
 
 
-var _chunkRYR324REcjs = require('./chunk-RYR324RE.cjs');
+var _chunkI7PQMDCOcjs = require('./chunk-I7PQMDCO.cjs');
 
 // src/api/chat-handler.ts
 var _anthropic = require('@ai-sdk/anthropic');
@@ -210,8 +210,8 @@ async function getSessionsByFilter(filter) {
 
 // src/api/chat-handler.ts
 function createChatHandler(options) {
-  const config = _chunkRYR324REcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
-  const knowledge = _chunkRYR324REcjs.loadKnowledge.call(void 0, options == null ? void 0 : options.knowledgePath);
+  const config = _chunkI7PQMDCOcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
+  const knowledge = _chunkI7PQMDCOcjs.loadKnowledge.call(void 0, options == null ? void 0 : options.knowledgePath);
   const systemPromptText = buildSystemPrompt(config, knowledge);
   async function POST(req) {
     try {
@@ -365,7 +365,7 @@ function detectLanguage(text) {
 // src/api/config-handler.ts
 function createConfigHandler(options) {
   async function GET() {
-    const config = _chunkRYR324REcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
+    const config = _chunkI7PQMDCOcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
     const clientConfig = {
       bot: config.bot,
       service: { name: config.service.name },
