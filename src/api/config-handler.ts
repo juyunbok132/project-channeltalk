@@ -15,6 +15,7 @@ export function createConfigHandler(options?: ConfigHandlerOptions) {
       email_form: config.email_form,
       limits: config.limits,
       brand_color: config.brand_color,
+      language: config.language,
     }
     return Response.json(clientConfig)
   }

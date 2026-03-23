@@ -60,6 +60,12 @@ const DEFAULT_CONFIG: AppConfig = {
     blocked_keywords: [],
   },
   brand_color: '#6366f1',
+  language: {
+    default: 'en',
+    supported: ['en', 'ko'],
+    auto_detect: false,
+    switch_button: false,
+  },
 }
 
 export function loadConfig(configPath?: string): AppConfig {

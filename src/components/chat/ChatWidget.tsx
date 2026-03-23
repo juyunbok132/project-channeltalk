@@ -31,7 +31,7 @@ function getTextFromMessage(message: UIMessage): string {
 export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(null)
-  const [language, setLanguage] = useState<Language>('ko')
+  const [language, setLanguage] = useState<Language>(config.language?.default || 'en')
   const [funnelState, setFunnelState] = useState<FunnelState>('normal')
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([])
   const [showPresets, setShowPresets] = useState(true)

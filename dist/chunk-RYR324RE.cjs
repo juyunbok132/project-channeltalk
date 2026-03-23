@@ -74,7 +74,13 @@ var DEFAULT_CONFIG = {
   security: {
     blocked_keywords: []
   },
-  brand_color: "#6366f1"
+  brand_color: "#6366f1",
+  language: {
+    default: "en",
+    supported: ["en", "ko"],
+    auto_detect: false,
+    switch_button: false
+  }
 };
 function loadConfig(configPath) {
   if (cachedConfig) return cachedConfig;

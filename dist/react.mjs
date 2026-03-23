@@ -187,9 +187,10 @@ function getTextFromMessage(message) {
   return "";
 }
 function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
+  var _a;
   const [isOpen, setIsOpen] = useState2(false);
   const [sessionId, setSessionId] = useState2(null);
-  const [language, setLanguage] = useState2("ko");
+  const [language, setLanguage] = useState2(((_a = config.language) == null ? void 0 : _a.default) || "en");
   const [funnelState, setFunnelState] = useState2("normal");
   const [followUpQuestions, setFollowUpQuestions] = useState2([]);
   const [showPresets, setShowPresets] = useState2(true);

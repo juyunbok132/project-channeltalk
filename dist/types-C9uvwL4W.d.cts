@@ -70,6 +70,12 @@ interface ServiceConfig {
         ko: string;
     };
 }
+interface LanguageConfig {
+    default: Language;
+    supported: Language[];
+    auto_detect: boolean;
+    switch_button: boolean;
+}
 interface AppConfig {
     bot: BotConfig;
     service: ServiceConfig;
@@ -80,6 +86,7 @@ interface AppConfig {
     cost_safety: CostSafetyConfig;
     security: SecurityConfig;
     brand_color: string;
+    language: LanguageConfig;
 }
 interface ChatMessage {
     role: 'user' | 'assistant';

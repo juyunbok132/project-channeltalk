@@ -67,6 +67,13 @@ export interface ServiceConfig {
   }
 }
 
+export interface LanguageConfig {
+  default: Language
+  supported: Language[]
+  auto_detect: boolean
+  switch_button: boolean
+}
+
 export interface AppConfig {
   bot: BotConfig
   service: ServiceConfig
@@ -77,6 +84,7 @@ export interface AppConfig {
   cost_safety: CostSafetyConfig
   security: SecurityConfig
   brand_color: string
+  language: LanguageConfig
 }
 
 // 세션 관련 타입

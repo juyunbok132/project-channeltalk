@@ -1,7 +1,7 @@
 import {
   loadConfig,
   loadKnowledge
-} from "./chunk-HC35BYZQ.mjs";
+} from "./chunk-TYXARZFF.mjs";
 
 // src/api/chat-handler.ts
 import { anthropic } from "@ai-sdk/anthropic";
@@ -373,7 +373,8 @@ function createConfigHandler(options) {
       presets: config.presets,
       email_form: config.email_form,
       limits: config.limits,
-      brand_color: config.brand_color
+      brand_color: config.brand_color,
+      language: config.language
     };
     return Response.json(clientConfig);
   }
