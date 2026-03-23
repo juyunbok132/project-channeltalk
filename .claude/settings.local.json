@@ -5,7 +5,12 @@
       "Bash(mkdir -p /tmp/channeltalk-backup)",
       "Bash(mv PLAN.md README.md templates /tmp/channeltalk-backup/)",
       "Bash(printf \"n\\\\nn\\\\n\")",
-      "Bash(yes \"n\")"
+      "Bash(yes \"n\")",
+      "Bash(cp /tmp/channeltalk-backup/PLAN.md .)",
+      "Bash(cp /tmp/channeltalk-backup/README.md .)",
+      "Bash(cp -r /tmp/channeltalk-backup/templates .)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init -d)"
     ]
   }
 }

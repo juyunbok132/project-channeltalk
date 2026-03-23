@@ -1,0 +1,107 @@
+# ============================================
+# Chatbot Configuration
+# 이 파일을 수정하여 챗봇을 커스터마이징하세요.
+# ============================================
+
+# --- 봇 캐릭터 ---
+bot:
+  name: "Assistant"                # 봇 이름
+  avatar: "/avatar.png"            # public/ 폴더의 아바타 이미지
+  greeting:
+    en: "Hi! How can I help you today?"
+    ko: "안녕하세요! 무엇을 도와드릴까요?"
+  tone: "friendly and concise"
+  fallback_message:
+    en: "That's a great question! For a more detailed answer, I'd love to connect you with our team."
+    ko: "좋은 질문이에요! 정확한 답변을 위해 담당자에게 연결해드릴게요."
+  out_of_scope_message:
+    en: "I can only help with questions about our service."
+    ko: "저는 서비스 관련 질문만 도와드릴 수 있어요."
+
+# --- 서비스 정보 ---
+service:
+  name: "Your Service Name"        # 서비스명
+  website: "https://example.com"
+  support_email: "support@example.com"
+
+# --- 프리셋 질문 ---
+preset_questions:
+  en:
+    - "What do you offer?"
+    - "How much does it cost?"
+    - "How do I get started?"
+  ko:
+    - "어떤 서비스인가요?"
+    - "가격이 얼마인가요?"
+    - "어떻게 시작하나요?"
+
+# --- CTA ---
+cta:
+  primary:
+    text: { en: "Get started →", ko: "시작하기 →" }
+    url: "/get-started"
+  email:
+    enabled: true
+    text: { en: "Contact us", ko: "문의하기" }
+  category_cta:
+    pricing:
+      text: { en: "See plans →", ko: "플랜 보기 →" }
+      url: "/pricing"
+
+# --- 이메일 폼 ---
+email_form:
+  fields:
+    - key: "name"
+      label: { en: "Name", ko: "이름" }
+      required: true
+    - key: "email"
+      label: { en: "Email", ko: "이메일" }
+      required: true
+    - key: "message"
+      label: { en: "Message", ko: "메시지" }
+      required: false
+
+# --- 대화 한도 ---
+limits:
+  max_messages_per_session: 10
+  soft_cta_after: 3
+  hard_redirect_after: 7
+  input_max_length: 300
+  history_turns_to_send: 5
+
+# --- API 비용 안전장치 ---
+cost_safety:
+  model: "claude-haiku-4-5-20251001"
+  monthly_budget_usd: 30
+  daily_budget_usd: 1.00
+  kill_switch_usd: 27
+  max_sessions_per_day: 50
+  rate_limit_per_minute: 5
+
+# --- 보안 ---
+security:
+  blocked_keywords:
+    - "system prompt"
+    - "ignore previous"
+    - "ignore above"
+    - "reveal your instructions"
+    - "show me your prompt"
+    - "disregard"
+    - "pretend you are"
+
+# --- 위젯 외관 ---
+widget:
+  position: "bottom-right"
+  brand_color: "#2563eb"
+  show_on_pages: "*"
+
+# --- 관리자 ---
+admin:
+  path: "/admin/chats"
+
+# --- 언어 ---
+language:
+  default: "en"
+  supported: ["en", "ko"]
+  auto_detect: true
+  switch_button: true
