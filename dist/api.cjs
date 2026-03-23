@@ -456,4 +456,7 @@ function createAdminHandler() {
 
 
 
-exports.createAdminHandler = createAdminHandler; exports.createChatHandler = createChatHandler; exports.createConfigHandler = createConfigHandler; exports.getAllSessions = getAllSessions; exports.getCostStats = getCostStats; exports.getSessionsByFilter = getSessionsByFilter;
+
+
+
+exports.addMessage = addMessage; exports.createAdminHandler = createAdminHandler; exports.createChatHandler = createChatHandler; exports.createConfigHandler = createConfigHandler; exports.getAllSessions = getAllSessions; exports.getCostStats = getCostStats; exports.getSession = getSession; exports.getSessionsByFilter = getSessionsByFilter; exports.updateSession = updateSession;

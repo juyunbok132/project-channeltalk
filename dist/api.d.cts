@@ -1,4 +1,4 @@
-import { c as ChatSession } from './types-DNVhhEoE.cjs';
+import { b as ChatMessage, c as ChatSession } from './types-DNVhhEoE.cjs';
 
 interface ChatHandlerOptions {
     knowledgePath?: string;
@@ -19,6 +19,9 @@ declare function createAdminHandler(): {
     GET: (req: Request) => Promise<Response>;
 };
 
+declare function getSession(sessionId: string): Promise<ChatSession | null>;
+declare function addMessage(sessionId: string, message: ChatMessage): Promise<void>;
+declare function updateSession(sessionId: string, updates: Partial<ChatSession>): Promise<void>;
 declare function getAllSessions(): Promise<ChatSession[]>;
 declare function getSessionsByFilter(filter: {
     language?: string;
@@ -40,4 +43,4 @@ declare function getCostStats(): {
     dailySessions: number;
 };
 
-export { type BudgetCheckResult, createAdminHandler, createChatHandler, createConfigHandler, getAllSessions, getCostStats, getSessionsByFilter };
+export { type BudgetCheckResult, addMessage, createAdminHandler, createChatHandler, createConfigHandler, getAllSessions, getCostStats, getSession, getSessionsByFilter, updateSession };

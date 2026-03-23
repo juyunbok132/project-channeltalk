@@ -353,7 +353,7 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
               fetch("/api/chat-email", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(data)
+                body: JSON.stringify(__spreadProps(__spreadValues({}, data), { sessionId }))
               });
             }
           }

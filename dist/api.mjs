@@ -450,10 +450,13 @@ function createAdminHandler() {
   return { GET };
 }
 export {
+  addMessage,
   createAdminHandler,
   createChatHandler,
   createConfigHandler,
   getAllSessions,
   getCostStats,
-  getSessionsByFilter
+  getSession,
+  getSessionsByFilter,
+  updateSession
 };
