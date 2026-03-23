@@ -97,6 +97,14 @@ export function loadConfig(configPath?: string): AppConfig {
     }))
   }
 
+  // email_form.fields: yaml uses "key", code uses "name"
+  if (merged.email_form?.fields) {
+    merged.email_form.fields = merged.email_form.fields.map((field: any) => ({
+      ...field,
+      name: field.name || field.key,
+    }))
+  }
+
   cachedConfig = merged
   return cachedConfig
 }

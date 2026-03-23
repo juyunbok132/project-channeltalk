@@ -1,4 +1,6 @@
 "use strict";Object.defineProperty(exports, "__esModule", {value: true}); function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }var __defProp = Object.defineProperty;
+var __defProps = Object.defineProperties;
+var __getOwnPropDescs = Object.getOwnPropertyDescriptors;
 var __getOwnPropSymbols = Object.getOwnPropertySymbols;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __propIsEnum = Object.prototype.propertyIsEnumerable;
@@ -14,6 +16,7 @@ var __spreadValues = (a, b) => {
     }
   return a;
 };
+var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
 
 // src/lib/config-loader.ts
 var _fs = require('fs'); var _fs2 = _interopRequireDefault(_fs);
@@ -84,6 +87,7 @@ var DEFAULT_CONFIG = {
   }
 };
 function loadConfig(configPath) {
+  var _a;
   if (cachedConfig) return cachedConfig;
   const resolvedPath = configPath || _path2.default.join(
     /* turbopackIgnore: true */
@@ -107,6 +111,11 @@ function loadConfig(configPath) {
     merged.presets = Array.from({ length: maxLen }, (_, i) => ({
       en: enList[i] || "",
       ko: koList[i] || ""
+    }));
+  }
+  if ((_a = merged.email_form) == null ? void 0 : _a.fields) {
+    merged.email_form.fields = merged.email_form.fields.map((field) => __spreadProps(__spreadValues({}, field), {
+      name: field.name || field.key
     }));
   }
   cachedConfig = merged;
