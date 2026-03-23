@@ -1,7 +1,7 @@
 "use strict";Object.defineProperty(exports, "__esModule", {value: true});
 
 
-var _chunkLBRL3GGRcjs = require('./chunk-LBRL3GGR.cjs');
+var _chunkVOXUZ3W5cjs = require('./chunk-VOXUZ3W5.cjs');
 
 // src/api/chat-handler.ts
 var _anthropic = require('@ai-sdk/anthropic');
@@ -256,8 +256,8 @@ async function getSessionsByFilter(filter) {
 
 // src/api/chat-handler.ts
 function createChatHandler(options) {
-  const config = _chunkLBRL3GGRcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
-  const knowledge = _chunkLBRL3GGRcjs.loadKnowledge.call(void 0, options == null ? void 0 : options.knowledgePath);
+  const config = _chunkVOXUZ3W5cjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
+  const knowledge = _chunkVOXUZ3W5cjs.loadKnowledge.call(void 0, options == null ? void 0 : options.knowledgePath);
   const systemPromptText = buildSystemPrompt(config, knowledge);
   async function POST(req) {
     try {
@@ -411,7 +411,7 @@ function detectLanguage(text) {
 // src/api/config-handler.ts
 function createConfigHandler(options) {
   async function GET() {
-    const config = _chunkLBRL3GGRcjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
+    const config = _chunkVOXUZ3W5cjs.loadConfig.call(void 0, options == null ? void 0 : options.configPath);
     const clientConfig = {
       bot: config.bot,
       service: { name: config.service.name },

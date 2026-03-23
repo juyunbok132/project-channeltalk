@@ -89,14 +89,25 @@ var DEFAULT_CONFIG = {
 function loadConfig(configPath) {
   var _a;
   if (cachedConfig) return cachedConfig;
-  const resolvedPath = configPath || _path2.default.join(
-    /* turbopackIgnore: true */
-    process.cwd(),
-    "chatbot",
-    "config.yaml"
-  );
-  if (!_fs2.default.existsSync(resolvedPath)) {
-    console.warn(`Config file not found at ${resolvedPath}, using defaults`);
+  const candidatePaths = configPath ? [configPath] : [
+    _path2.default.join(
+      /* turbopackIgnore: true */
+      process.cwd(),
+      "chatbot",
+      "config.yaml"
+    ),
+    _path2.default.join(
+      /* turbopackIgnore: true */
+      process.cwd(),
+      "..",
+      "chatbot",
+      "config.yaml"
+    ),
+    _path2.default.resolve("chatbot", "config.yaml")
+  ];
+  const resolvedPath = candidatePaths.find((p) => _fs2.default.existsSync(p));
+  if (!resolvedPath) {
+    console.warn(`Config file not found in any of: ${candidatePaths.join(", ")}, using defaults`);
     cachedConfig = DEFAULT_CONFIG;
     return cachedConfig;
   }
@@ -145,14 +156,25 @@ function deepMerge(target, source) {
 var cachedKnowledge = null;
 function loadKnowledge(knowledgePath) {
   if (cachedKnowledge) return cachedKnowledge;
-  const resolvedPath = knowledgePath || _path2.default.join(
-    /* turbopackIgnore: true */
-    process.cwd(),
-    "chatbot",
-    "knowledge.md"
-  );
-  if (!_fs2.default.existsSync(resolvedPath)) {
-    console.warn(`Knowledge file not found at ${resolvedPath}`);
+  const candidatePaths = knowledgePath ? [knowledgePath] : [
+    _path2.default.join(
+      /* turbopackIgnore: true */
+      process.cwd(),
+      "chatbot",
+      "knowledge.md"
+    ),
+    _path2.default.join(
+      /* turbopackIgnore: true */
+      process.cwd(),
+      "..",
+      "chatbot",
+      "knowledge.md"
+    ),
+    _path2.default.resolve("chatbot", "knowledge.md")
+  ];
+  const resolvedPath = candidatePaths.find((p) => _fs2.default.existsSync(p));
+  if (!resolvedPath) {
+    console.warn(`Knowledge file not found in any of: ${candidatePaths.join(", ")}`);
     return "";
   }
   const raw = _fs2.default.readFileSync(resolvedPath, "utf-8");

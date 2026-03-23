@@ -6,10 +6,18 @@ let cachedKnowledge: string | null = null
 export function loadKnowledge(knowledgePath?: string): string {
   if (cachedKnowledge) return cachedKnowledge
 
-  const resolvedPath = knowledgePath || path.join(/* turbopackIgnore: true */ process.cwd(), 'chatbot', 'knowledge.md')
+  const candidatePaths = knowledgePath
+    ? [knowledgePath]
+    : [
+        path.join(/* turbopackIgnore: true */ process.cwd(), 'chatbot', 'knowledge.md'),
+        path.join(/* turbopackIgnore: true */ process.cwd(), '..', 'chatbot', 'knowledge.md'),
+        path.resolve('chatbot', 'knowledge.md'),
+      ]
 
-  if (!fs.existsSync(resolvedPath)) {
-    console.warn(`Knowledge file not found at ${resolvedPath}`)
+  const resolvedPath = candidatePaths.find((p) => fs.existsSync(p))
+
+  if (!resolvedPath) {
+    console.warn(`Knowledge file not found in any of: ${candidatePaths.join(', ')}`)
     return ''
   }
 

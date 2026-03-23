@@ -89,14 +89,25 @@ var DEFAULT_CONFIG = {
 function loadConfig(configPath) {
   var _a;
   if (cachedConfig) return cachedConfig;
-  const resolvedPath = configPath || path.join(
-    /* turbopackIgnore: true */
-    process.cwd(),
-    "chatbot",
-    "config.yaml"
-  );
-  if (!fs.existsSync(resolvedPath)) {
-    console.warn(`Config file not found at ${resolvedPath}, using defaults`);
+  const candidatePaths = configPath ? [configPath] : [
+    path.join(
+      /* turbopackIgnore: true */
+      process.cwd(),
+      "chatbot",
+      "config.yaml"
+    ),
+    path.join(
+      /* turbopackIgnore: true */
+      process.cwd(),
+      "..",
+      "chatbot",
+      "config.yaml"
+    ),
+    path.resolve("chatbot", "config.yaml")
+  ];
+  const resolvedPath = candidatePaths.find((p) => fs.existsSync(p));
+  if (!resolvedPath) {
+    console.warn(`Config file not found in any of: ${candidatePaths.join(", ")}, using defaults`);
     cachedConfig = DEFAULT_CONFIG;
     return cachedConfig;
   }
@@ -145,14 +156,25 @@ import path2 from "path";
 var cachedKnowledge = null;
 function loadKnowledge(knowledgePath) {
   if (cachedKnowledge) return cachedKnowledge;
-  const resolvedPath = knowledgePath || path2.join(
-    /* turbopackIgnore: true */
-    process.cwd(),
-    "chatbot",
-    "knowledge.md"
-  );
-  if (!fs2.existsSync(resolvedPath)) {
-    console.warn(`Knowledge file not found at ${resolvedPath}`);
+  const candidatePaths = knowledgePath ? [knowledgePath] : [
+    path2.join(
+      /* turbopackIgnore: true */
+      process.cwd(),
+      "chatbot",
+      "knowledge.md"
+    ),
+    path2.join(
+      /* turbopackIgnore: true */
+      process.cwd(),
+      "..",
+      "chatbot",
+      "knowledge.md"
+    ),
+    path2.resolve("chatbot", "knowledge.md")
+  ];
+  const resolvedPath = candidatePaths.find((p) => fs2.existsSync(p));
+  if (!resolvedPath) {
+    console.warn(`Knowledge file not found in any of: ${candidatePaths.join(", ")}`);
     return "";
   }
   const raw = fs2.readFileSync(resolvedPath, "utf-8");

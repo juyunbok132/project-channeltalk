@@ -1,7 +1,7 @@
 import {
   loadConfig,
   loadKnowledge
-} from "./chunk-TBKNKCE3.mjs";
+} from "./chunk-DUA3CTUB.mjs";
 
 // src/api/chat-handler.ts
 import { anthropic } from "@ai-sdk/anthropic";

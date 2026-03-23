@@ -72,10 +72,18 @@ const DEFAULT_CONFIG: AppConfig = {
 export function loadConfig(configPath?: string): AppConfig {
   if (cachedConfig) return cachedConfig
 
-  const resolvedPath = configPath || path.join(/* turbopackIgnore: true */ process.cwd(), 'chatbot', 'config.yaml')
+  const candidatePaths = configPath
+    ? [configPath]
+    : [
+        path.join(/* turbopackIgnore: true */ process.cwd(), 'chatbot', 'config.yaml'),
+        path.join(/* turbopackIgnore: true */ process.cwd(), '..', 'chatbot', 'config.yaml'),
+        path.resolve('chatbot', 'config.yaml'),
+      ]
 
-  if (!fs.existsSync(resolvedPath)) {
-    console.warn(`Config file not found at ${resolvedPath}, using defaults`)
+  const resolvedPath = candidatePaths.find((p) => fs.existsSync(p))
+
+  if (!resolvedPath) {
+    console.warn(`Config file not found in any of: ${candidatePaths.join(', ')}, using defaults`)
     cachedConfig = DEFAULT_CONFIG
     return cachedConfig
   }
