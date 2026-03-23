@@ -23,7 +23,7 @@ export function createChatHandler(options?: ChatHandlerOptions) {
       const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
 
       // 비용 안전장치 체크
-      const budgetCheck = checkBudget(config.cost_safety, ip)
+      const budgetCheck = await checkBudget(config.cost_safety, ip)
       if (!budgetCheck.allowed) {
         return Response.json(
           { error: 'budget_exceeded', reason: budgetCheck.reason },
@@ -59,7 +59,7 @@ export function createChatHandler(options?: ChatHandlerOptions) {
       if (!session) {
         sessionId = generateSessionId()
         session = await createSession(sessionId)
-        recordSession()
+        await recordSession()
       }
 
       // 메시지 한도 체크
@@ -166,7 +166,7 @@ export function createChatHandler(options?: ChatHandlerOptions) {
               cacheReadTokens: event.usage.inputTokenDetails?.cacheReadTokens || 0,
               cacheWriteTokens: event.usage.inputTokenDetails?.cacheWriteTokens || 0,
             })
-            recordCost(cost)
+            await recordCost(cost)
             await updateSession(sessionId!, {
               cost_usd: (session!.cost_usd || 0) + cost,
             })

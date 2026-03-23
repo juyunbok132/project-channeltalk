@@ -37,10 +37,10 @@ interface BudgetCheckResult {
     dailyCost?: number;
     monthlyCost?: number;
 }
-declare function getCostStats(): {
+declare function getCostStats(): Promise<{
     dailyCost: number;
     monthlyCost: number;
     dailySessions: number;
-};
+}>;
 
 export { type BudgetCheckResult, addMessage, createAdminHandler, createChatHandler, createConfigHandler, getAllSessions, getCostStats, getSession, getSessionsByFilter, updateSession };

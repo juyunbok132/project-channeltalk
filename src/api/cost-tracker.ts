@@ -1,3 +1,4 @@
+import { createClient } from 'redis'
 import type { CostSafetyConfig } from '../lib/types'
 
 // Haiku 4.5 가격 (per 1M tokens)
@@ -8,20 +9,27 @@ const PRICING = {
   cache_read: 0.1,
 }
 
-// 인메모리 비용 추적 (Phase 1)
-// Phase 2에서 Vercel KV로 교체
-interface CostRecord {
-  daily: Map<string, number> // "YYYY-MM-DD" -> cost
-  monthly: Map<string, number> // "YYYY-MM" -> cost
-  sessionCountDaily: Map<string, number> // "YYYY-MM-DD" -> count
-  requestsPerMinute: Map<string, number[]> // ip -> timestamps
-}
+// Redis 키 패턴
+// cost:daily:{YYYY-MM-DD} -> number (string)
+// cost:monthly:{YYYY-MM} -> number (string)
+// cost:sessions:{YYYY-MM-DD} -> number
+// Rate limiting은 인메모리 유지 (단기 데이터, Redis 호출 최소화)
 
-const costRecord: CostRecord = {
-  daily: new Map(),
-  monthly: new Map(),
-  sessionCountDaily: new Map(),
-  requestsPerMinute: new Map(),
+const requestsPerMinute = new Map<string, number[]>()
+
+// Redis 클라이언트 싱글턴
+let client: ReturnType<typeof createClient> | null = null
+
+async function getClient() {
+  if (!client) {
+    client = createClient({ url: process.env.REDIS_URL })
+    client.on('error', (err) => console.error('Redis error:', err))
+    await client.connect()
+  }
+  if (!client.isOpen) {
+    await client.connect()
+  }
+  return client
 }
 
 function todayKey(): string {
@@ -45,16 +53,26 @@ export function calculateCost(usage: {
   return inputCost + outputCost + cacheWriteCost + cacheReadCost
 }
 
-export function recordCost(cost: number): void {
+export async function recordCost(cost: number): Promise<void> {
+  const redis = await getClient()
   const day = todayKey()
   const month = monthKey()
-  costRecord.daily.set(day, (costRecord.daily.get(day) || 0) + cost)
-  costRecord.monthly.set(month, (costRecord.monthly.get(month) || 0) + cost)
+  await Promise.all([
+    redis.incrByFloat(`cost:daily:${day}`, cost),
+    redis.incrByFloat(`cost:monthly:${month}`, cost),
+  ])
+  // 일별 키는 48시간 후 만료, 월별 키는 35일 후 만료
+  await Promise.all([
+    redis.expire(`cost:daily:${day}`, 60 * 60 * 48),
+    redis.expire(`cost:monthly:${month}`, 60 * 60 * 24 * 35),
+  ])
 }
 
-export function recordSession(): void {
+export async function recordSession(): Promise<void> {
+  const redis = await getClient()
   const day = todayKey()
-  costRecord.sessionCountDaily.set(day, (costRecord.sessionCountDaily.get(day) || 0) + 1)
+  await redis.incr(`cost:sessions:${day}`)
+  await redis.expire(`cost:sessions:${day}`, 60 * 60 * 48)
 }
 
 export interface BudgetCheckResult {
@@ -64,12 +82,20 @@ export interface BudgetCheckResult {
   monthlyCost?: number
 }
 
-export function checkBudget(config: CostSafetyConfig, ip?: string): BudgetCheckResult {
+export async function checkBudget(config: CostSafetyConfig, ip?: string): Promise<BudgetCheckResult> {
+  const redis = await getClient()
   const day = todayKey()
   const month = monthKey()
-  const dailyCost = costRecord.daily.get(day) || 0
-  const monthlyCost = costRecord.monthly.get(month) || 0
-  const sessionCount = costRecord.sessionCountDaily.get(day) || 0
+
+  const [dailyStr, monthlyStr, sessionStr] = await Promise.all([
+    redis.get(`cost:daily:${day}`),
+    redis.get(`cost:monthly:${month}`),
+    redis.get(`cost:sessions:${day}`),
+  ])
+
+  const dailyCost = parseFloat(dailyStr || '0')
+  const monthlyCost = parseFloat(monthlyStr || '0')
+  const sessionCount = parseInt(sessionStr || '0', 10)
 
   if (monthlyCost >= config.kill_switch_usd) {
     return { allowed: false, reason: 'kill_switch', dailyCost, monthlyCost }
@@ -87,29 +113,35 @@ export function checkBudget(config: CostSafetyConfig, ip?: string): BudgetCheckR
     return { allowed: false, reason: 'session_limit', dailyCost, monthlyCost }
   }
 
-  // IP 기반 분당 제한
+  // IP 기반 분당 제한 (인메모리 — 단기 데이터)
   if (ip) {
     const now = Date.now()
-    const timestamps = costRecord.requestsPerMinute.get(ip) || []
+    const timestamps = requestsPerMinute.get(ip) || []
     const recentTimestamps = timestamps.filter((t) => now - t < 60_000)
     if (recentTimestamps.length >= config.rate_limit_per_minute) {
       return { allowed: false, reason: 'rate_limit', dailyCost, monthlyCost }
     }
     recentTimestamps.push(now)
-    costRecord.requestsPerMinute.set(ip, recentTimestamps)
+    requestsPerMinute.set(ip, recentTimestamps)
   }
 
   return { allowed: true, dailyCost, monthlyCost }
 }
 
-export function getCostStats(): {
+export async function getCostStats(): Promise<{
   dailyCost: number
   monthlyCost: number
   dailySessions: number
-} {
+}> {
+  const redis = await getClient()
+  const [dailyStr, monthlyStr, sessionsStr] = await Promise.all([
+    redis.get(`cost:daily:${todayKey()}`),
+    redis.get(`cost:monthly:${monthKey()}`),
+    redis.get(`cost:sessions:${todayKey()}`),
+  ])
   return {
-    dailyCost: costRecord.daily.get(todayKey()) || 0,
-    monthlyCost: costRecord.monthly.get(monthKey()) || 0,
-    dailySessions: costRecord.sessionCountDaily.get(todayKey()) || 0,
+    dailyCost: parseFloat(dailyStr || '0'),
+    monthlyCost: parseFloat(monthlyStr || '0'),
+    dailySessions: parseInt(sessionsStr || '0', 10),
   }
 }

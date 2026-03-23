@@ -20,7 +20,7 @@ export function createAdminHandler() {
       sessions = await getAllSessions()
     }
 
-    const costStats = getCostStats()
+    const costStats = await getCostStats()
     return Response.json({ sessions, costStats })
   }
 

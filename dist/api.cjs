@@ -113,18 +113,26 @@ function filterOutput(output) {
 }
 
 // src/api/cost-tracker.ts
+var _redis = require('redis');
 var PRICING = {
   input: 1,
   output: 5,
   cache_write: 1.25,
   cache_read: 0.1
 };
-var costRecord = {
-  daily: /* @__PURE__ */ new Map(),
-  monthly: /* @__PURE__ */ new Map(),
-  sessionCountDaily: /* @__PURE__ */ new Map(),
-  requestsPerMinute: /* @__PURE__ */ new Map()
-};
+var requestsPerMinute = /* @__PURE__ */ new Map();
+var client = null;
+async function getClient() {
+  if (!client) {
+    client = _redis.createClient.call(void 0, { url: process.env.REDIS_URL });
+    client.on("error", (err) => console.error("Redis error:", err));
+    await client.connect();
+  }
+  if (!client.isOpen) {
+    await client.connect();
+  }
+  return client;
+}
 function todayKey() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 }
@@ -138,22 +146,37 @@ function calculateCost(usage) {
   const cacheReadCost = (usage.cacheReadTokens || 0) / 1e6 * PRICING.cache_read;
   return inputCost + outputCost + cacheWriteCost + cacheReadCost;
 }
-function recordCost(cost) {
+async function recordCost(cost) {
+  const redis = await getClient();
   const day = todayKey();
   const month = monthKey();
-  costRecord.daily.set(day, (costRecord.daily.get(day) || 0) + cost);
-  costRecord.monthly.set(month, (costRecord.monthly.get(month) || 0) + cost);
+  await Promise.all([
+    redis.incrByFloat(`cost:daily:${day}`, cost),
+    redis.incrByFloat(`cost:monthly:${month}`, cost)
+  ]);
+  await Promise.all([
+    redis.expire(`cost:daily:${day}`, 60 * 60 * 48),
+    redis.expire(`cost:monthly:${month}`, 60 * 60 * 24 * 35)
+  ]);
 }
-function recordSession() {
+async function recordSession() {
+  const redis = await getClient();
   const day = todayKey();
-  costRecord.sessionCountDaily.set(day, (costRecord.sessionCountDaily.get(day) || 0) + 1);
+  await redis.incr(`cost:sessions:${day}`);
+  await redis.expire(`cost:sessions:${day}`, 60 * 60 * 48);
 }
-function checkBudget(config, ip) {
+async function checkBudget(config, ip) {
+  const redis = await getClient();
   const day = todayKey();
   const month = monthKey();
-  const dailyCost = costRecord.daily.get(day) || 0;
-  const monthlyCost = costRecord.monthly.get(month) || 0;
-  const sessionCount = costRecord.sessionCountDaily.get(day) || 0;
+  const [dailyStr, monthlyStr, sessionStr] = await Promise.all([
+    redis.get(`cost:daily:${day}`),
+    redis.get(`cost:monthly:${month}`),
+    redis.get(`cost:sessions:${day}`)
+  ]);
+  const dailyCost = parseFloat(dailyStr || "0");
+  const monthlyCost = parseFloat(monthlyStr || "0");
+  const sessionCount = parseInt(sessionStr || "0", 10);
   if (monthlyCost >= config.kill_switch_usd) {
     return { allowed: false, reason: "kill_switch", dailyCost, monthlyCost };
   }
@@ -168,35 +191,60 @@ function checkBudget(config, ip) {
   }
   if (ip) {
     const now = Date.now();
-    const timestamps = costRecord.requestsPerMinute.get(ip) || [];
+    const timestamps = requestsPerMinute.get(ip) || [];
     const recentTimestamps = timestamps.filter((t) => now - t < 6e4);
     if (recentTimestamps.length >= config.rate_limit_per_minute) {
       return { allowed: false, reason: "rate_limit", dailyCost, monthlyCost };
     }
     recentTimestamps.push(now);
-    costRecord.requestsPerMinute.set(ip, recentTimestamps);
+    requestsPerMinute.set(ip, recentTimestamps);
   }
   return { allowed: true, dailyCost, monthlyCost };
 }
-function getCostStats() {
+async function getCostStats() {
+  const redis = await getClient();
+  const [dailyStr, monthlyStr, sessionsStr] = await Promise.all([
+    redis.get(`cost:daily:${todayKey()}`),
+    redis.get(`cost:monthly:${monthKey()}`),
+    redis.get(`cost:sessions:${todayKey()}`)
+  ]);
   return {
-    dailyCost: costRecord.daily.get(todayKey()) || 0,
-    monthlyCost: costRecord.monthly.get(monthKey()) || 0,
-    dailySessions: costRecord.sessionCountDaily.get(todayKey()) || 0
+    dailyCost: parseFloat(dailyStr || "0"),
+    monthlyCost: parseFloat(monthlyStr || "0"),
+    dailySessions: parseInt(sessionsStr || "0", 10)
   };
 }
 
 // src/api/session-store.ts
-var sessions = /* @__PURE__ */ new Map();
+
+var SESSION_PREFIX = "chat:session:";
+var SESSION_INDEX = "chat:session_ids";
+var SESSION_TTL = 60 * 60 * 24 * 30;
+var client2 = null;
+async function getClient2() {
+  if (!client2) {
+    client2 = _redis.createClient.call(void 0, { url: process.env.REDIS_URL });
+    client2.on("error", (err) => console.error("Redis error:", err));
+    await client2.connect();
+  }
+  if (!client2.isOpen) {
+    await client2.connect();
+  }
+  return client2;
+}
 function generateSessionId() {
   const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, "");
   const rand = Math.random().toString(36).slice(2, 8);
   return `s_${date}_${rand}`;
 }
 async function getSession(sessionId) {
-  return sessions.get(sessionId) || null;
+  const redis = await getClient2();
+  const data = await redis.get(`${SESSION_PREFIX}${sessionId}`);
+  if (!data) return null;
+  return JSON.parse(data);
 }
 async function createSession(sessionId, metadata) {
+  const redis = await getClient2();
   const session = {
     session_id: sessionId,
     created_at: (/* @__PURE__ */ new Date()).toISOString(),
@@ -209,31 +257,38 @@ async function createSession(sessionId, metadata) {
     metadata: metadata || {},
     cost_usd: 0
   };
-  sessions.set(sessionId, session);
+  await redis.set(`${SESSION_PREFIX}${sessionId}`, JSON.stringify(session), { EX: SESSION_TTL });
+  await redis.zAdd(SESSION_INDEX, { score: Date.now(), value: sessionId });
   return session;
 }
 async function addMessage(sessionId, message) {
-  const session = sessions.get(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return;
   session.messages.push(message);
   if (message.role === "user") {
     session.message_count++;
   }
-  sessions.set(sessionId, session);
+  const redis = await getClient2();
+  await redis.set(`${SESSION_PREFIX}${sessionId}`, JSON.stringify(session), { EX: SESSION_TTL });
 }
 async function updateSession(sessionId, updates) {
-  const session = sessions.get(sessionId);
+  const session = await getSession(sessionId);
   if (!session) return;
   Object.assign(session, updates);
-  sessions.set(sessionId, session);
+  const redis = await getClient2();
+  await redis.set(`${SESSION_PREFIX}${sessionId}`, JSON.stringify(session), { EX: SESSION_TTL });
 }
 async function getAllSessions() {
-  return Array.from(sessions.values()).sort(
-    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-  );
+  const redis = await getClient2();
+  const sessionIds = await redis.zRange(SESSION_INDEX, 0, 199, { REV: true });
+  if (!sessionIds.length) return [];
+  const keys = sessionIds.map((id) => `${SESSION_PREFIX}${id}`);
+  const values = await redis.mGet(keys);
+  return values.filter((v) => v !== null).map((v) => JSON.parse(v)).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 }
 async function getSessionsByFilter(filter) {
-  let result = Array.from(sessions.values());
+  const all = await getAllSessions();
+  let result = all;
   if (filter.language) {
     result = result.filter((s) => s.language === filter.language);
   }
@@ -262,7 +317,7 @@ function createChatHandler(options) {
   async function POST(req) {
     try {
       const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
-      const budgetCheck = checkBudget(config.cost_safety, ip);
+      const budgetCheck = await checkBudget(config.cost_safety, ip);
       if (!budgetCheck.allowed) {
         return Response.json(
           { error: "budget_exceeded", reason: budgetCheck.reason },
@@ -290,7 +345,7 @@ function createChatHandler(options) {
       if (!session) {
         sessionId = generateSessionId();
         session = await createSession(sessionId);
-        recordSession();
+        await recordSession();
       }
       if (session.message_count >= config.limits.max_messages_per_session) {
         return Response.json(
@@ -370,7 +425,7 @@ function createChatHandler(options) {
               cacheReadTokens: ((_a = event.usage.inputTokenDetails) == null ? void 0 : _a.cacheReadTokens) || 0,
               cacheWriteTokens: ((_b = event.usage.inputTokenDetails) == null ? void 0 : _b.cacheWriteTokens) || 0
             });
-            recordCost(cost);
+            await recordCost(cost);
             await updateSession(sessionId, {
               cost_usd: (session.cost_usd || 0) + cost
             });
@@ -436,16 +491,16 @@ function createAdminHandler() {
     }
     const url = new URL(req.url);
     const filter = url.searchParams.get("filter");
-    let sessions2;
+    let sessions;
     if (filter === "unanswered") {
-      sessions2 = await getSessionsByFilter({ has_fallback: true });
+      sessions = await getSessionsByFilter({ has_fallback: true });
     } else if (filter) {
-      sessions2 = await getSessionsByFilter(JSON.parse(filter));
+      sessions = await getSessionsByFilter(JSON.parse(filter));
     } else {
-      sessions2 = await getAllSessions();
+      sessions = await getAllSessions();
     }
-    const costStats = getCostStats();
-    return Response.json({ sessions: sessions2, costStats });
+    const costStats = await getCostStats();
+    return Response.json({ sessions, costStats });
   }
   return { GET };
 }
