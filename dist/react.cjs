@@ -212,10 +212,16 @@ function getTextFromMessage(message) {
   }
   return "";
 }
+var SESSION_STORAGE_KEY = "channeltalk_session_id";
 function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
   var _a;
   const [isOpen, setIsOpen] = (0, import_react2.useState)(false);
-  const [sessionId, setSessionId] = (0, import_react2.useState)(null);
+  const [sessionId, setSessionId] = (0, import_react2.useState)(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(SESSION_STORAGE_KEY);
+    }
+    return null;
+  });
   const [language, setLanguage] = (0, import_react2.useState)(((_a = config.language) == null ? void 0 : _a.default) || "en");
   const [funnelState, setFunnelState] = (0, import_react2.useState)("normal");
   const [followUpQuestions, setFollowUpQuestions] = (0, import_react2.useState)([]);
@@ -224,7 +230,22 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
   const [inputValue, setInputValue] = (0, import_react2.useState)("");
   const scrollRef = (0, import_react2.useRef)(null);
   const { messages, sendMessage, status } = (0, import_react3.useChat)({
-    transport: new import_ai.DefaultChatTransport({ api: apiEndpoint }),
+    transport: new import_ai.DefaultChatTransport({
+      api: apiEndpoint,
+      fetch: async (input, init) => {
+        const response = await fetch(input, init);
+        const newSessionId = response.headers.get("x-session-id");
+        if (newSessionId && newSessionId !== sessionId) {
+          setSessionId(newSessionId);
+          localStorage.setItem(SESSION_STORAGE_KEY, newSessionId);
+        }
+        const funnel = response.headers.get("x-funnel-state");
+        if (funnel) {
+          setFunnelState(funnel);
+        }
+        return response;
+      }
+    }),
     onFinish: ({ message }) => {
       const text = getTextFromMessage(message);
       setShowPresets(true);

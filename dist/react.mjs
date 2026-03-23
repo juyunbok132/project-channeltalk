@@ -186,10 +186,16 @@ function getTextFromMessage(message) {
   }
   return "";
 }
+var SESSION_STORAGE_KEY = "channeltalk_session_id";
 function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
   var _a;
   const [isOpen, setIsOpen] = useState2(false);
-  const [sessionId, setSessionId] = useState2(null);
+  const [sessionId, setSessionId] = useState2(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(SESSION_STORAGE_KEY);
+    }
+    return null;
+  });
   const [language, setLanguage] = useState2(((_a = config.language) == null ? void 0 : _a.default) || "en");
   const [funnelState, setFunnelState] = useState2("normal");
   const [followUpQuestions, setFollowUpQuestions] = useState2([]);
@@ -198,7 +204,22 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
   const [inputValue, setInputValue] = useState2("");
   const scrollRef = useRef(null);
   const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: apiEndpoint }),
+    transport: new DefaultChatTransport({
+      api: apiEndpoint,
+      fetch: async (input, init) => {
+        const response = await fetch(input, init);
+        const newSessionId = response.headers.get("x-session-id");
+        if (newSessionId && newSessionId !== sessionId) {
+          setSessionId(newSessionId);
+          localStorage.setItem(SESSION_STORAGE_KEY, newSessionId);
+        }
+        const funnel = response.headers.get("x-funnel-state");
+        if (funnel) {
+          setFunnelState(funnel);
+        }
+        return response;
+      }
+    }),
     onFinish: ({ message }) => {
       const text = getTextFromMessage(message);
       setShowPresets(true);

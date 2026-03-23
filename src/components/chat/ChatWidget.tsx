@@ -28,9 +28,16 @@ function getTextFromMessage(message: UIMessage): string {
   return ''
 }
 
+const SESSION_STORAGE_KEY = 'channeltalk_session_id'
+
 export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [sessionId, setSessionId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem(SESSION_STORAGE_KEY)
+    }
+    return null
+  })
   const [language, setLanguage] = useState<Language>(config.language?.default || 'en')
   const [funnelState, setFunnelState] = useState<FunnelState>('normal')
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([])
@@ -40,7 +47,22 @@ export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProp
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({ api: apiEndpoint }),
+    transport: new DefaultChatTransport({
+      api: apiEndpoint,
+      fetch: async (input, init) => {
+        const response = await fetch(input, init)
+        const newSessionId = response.headers.get('x-session-id')
+        if (newSessionId && newSessionId !== sessionId) {
+          setSessionId(newSessionId)
+          localStorage.setItem(SESSION_STORAGE_KEY, newSessionId)
+        }
+        const funnel = response.headers.get('x-funnel-state')
+        if (funnel) {
+          setFunnelState(funnel as FunnelState)
+        }
+        return response
+      },
+    }),
     onFinish: ({ message }: { message: UIMessage }) => {
       const text = getTextFromMessage(message)
       // 첫 AI 응답 후 프리셋 질문 표시
