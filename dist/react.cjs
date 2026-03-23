@@ -219,7 +219,7 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
   const [language, setLanguage] = (0, import_react2.useState)(((_a = config.language) == null ? void 0 : _a.default) || "en");
   const [funnelState, setFunnelState] = (0, import_react2.useState)("normal");
   const [followUpQuestions, setFollowUpQuestions] = (0, import_react2.useState)([]);
-  const [showPresets, setShowPresets] = (0, import_react2.useState)(true);
+  const [showPresets, setShowPresets] = (0, import_react2.useState)(false);
   const [messageCount, setMessageCount] = (0, import_react2.useState)(0);
   const [inputValue, setInputValue] = (0, import_react2.useState)("");
   const scrollRef = (0, import_react2.useRef)(null);
@@ -227,6 +227,7 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
     transport: new import_ai.DefaultChatTransport({ api: apiEndpoint }),
     onFinish: ({ message }) => {
       const text = getTextFromMessage(message);
+      setShowPresets(true);
       const jsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?\s*```/);
       if (jsonMatch) {
         try {

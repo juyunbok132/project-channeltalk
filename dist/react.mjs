@@ -193,7 +193,7 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
   const [language, setLanguage] = useState2(((_a = config.language) == null ? void 0 : _a.default) || "en");
   const [funnelState, setFunnelState] = useState2("normal");
   const [followUpQuestions, setFollowUpQuestions] = useState2([]);
-  const [showPresets, setShowPresets] = useState2(true);
+  const [showPresets, setShowPresets] = useState2(false);
   const [messageCount, setMessageCount] = useState2(0);
   const [inputValue, setInputValue] = useState2("");
   const scrollRef = useRef(null);
@@ -201,6 +201,7 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
     transport: new DefaultChatTransport({ api: apiEndpoint }),
     onFinish: ({ message }) => {
       const text = getTextFromMessage(message);
+      setShowPresets(true);
       const jsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?\s*```/);
       if (jsonMatch) {
         try {

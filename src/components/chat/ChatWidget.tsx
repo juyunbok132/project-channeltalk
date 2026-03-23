@@ -34,7 +34,7 @@ export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProp
   const [language, setLanguage] = useState<Language>(config.language?.default || 'en')
   const [funnelState, setFunnelState] = useState<FunnelState>('normal')
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([])
-  const [showPresets, setShowPresets] = useState(true)
+  const [showPresets, setShowPresets] = useState(false)
   const [messageCount, setMessageCount] = useState(0)
   const [inputValue, setInputValue] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -43,6 +43,8 @@ export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProp
     transport: new DefaultChatTransport({ api: apiEndpoint }),
     onFinish: ({ message }: { message: UIMessage }) => {
       const text = getTextFromMessage(message)
+      // 첫 AI 응답 후 프리셋 질문 표시
+      setShowPresets(true)
       // 후속 질문 파싱
       const jsonMatch = text.match(/```json\s*\n?([\s\S]*?)\n?\s*```/)
       if (jsonMatch) {
