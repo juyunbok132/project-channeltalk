@@ -246,7 +246,6 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
   }, [messages, followUpQuestions]);
   const doSendMessage = (0, import_react2.useCallback)(
     (text) => {
-      setShowPresets(false);
       setFollowUpQuestions([]);
       setInputValue("");
       const koreanChars = text.match(/[\uAC00-\uD7AF]/g);
@@ -328,7 +327,7 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
             brandColor: config.brand_color
           }
         ) }),
-        showPresets && messages.length === 0 && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
+        showPresets && /* @__PURE__ */ (0, import_jsx_runtime6.jsx)(
           PresetButtons,
           {
             presets: config.presets,

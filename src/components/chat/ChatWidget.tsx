@@ -67,7 +67,6 @@ export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProp
 
   const doSendMessage = useCallback(
     (text: string) => {
-      setShowPresets(false)
       setFollowUpQuestions([])
       setInputValue('')
 
@@ -173,7 +172,7 @@ export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProp
             )}
 
             {/* 프리셋 버튼 */}
-            {showPresets && messages.length === 0 && (
+            {showPresets && (
               <PresetButtons
                 presets={config.presets}
                 language={language}
