@@ -29,6 +29,8 @@ function getTextFromMessage(message: UIMessage): string {
 }
 
 const SESSION_STORAGE_KEY = 'channeltalk_session_id'
+const VISIT_COUNT_KEY = 'channeltalk_visit_count'
+const FIRST_VISIT_KEY = 'channeltalk_first_visit'
 
 export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -102,11 +104,36 @@ export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProp
         setLanguage('en')
       }
 
-      setMessageCount((c) => c + 1)
-      sendMessage({
-        text,
-      }, {
-        body: { sessionId },
+      setMessageCount((c) => {
+        const newCount = c + 1
+        // 첫 메시지일 때만 메타데이터 전송
+        if (newCount === 1) {
+          // 방문 횟수 증가
+          const prevCount = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10)
+          const visitCount = prevCount + 1
+          localStorage.setItem(VISIT_COUNT_KEY, String(visitCount))
+
+          // 최초 방문 시각 기록
+          if (!localStorage.getItem(FIRST_VISIT_KEY)) {
+            localStorage.setItem(FIRST_VISIT_KEY, new Date().toISOString())
+          }
+          const firstVisitAt = localStorage.getItem(FIRST_VISIT_KEY) || undefined
+
+          sendMessage({ text }, {
+            body: {
+              sessionId,
+              metadata: {
+                page_url: window.location.href,
+                referrer: document.referrer || undefined,
+                visit_count: visitCount,
+                first_visit_at: firstVisitAt,
+              },
+            },
+          })
+        } else {
+          sendMessage({ text }, { body: { sessionId } })
+        }
+        return newCount
       })
     },
     [sendMessage, sessionId]

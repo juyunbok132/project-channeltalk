@@ -6,7 +6,7 @@ import { buildSystemPrompt } from './system-prompt'
 import { filterInput, filterOutput } from './input-filter'
 import { checkBudget, calculateCost, recordCost, recordSession } from './cost-tracker'
 import { getSession, createSession, addMessage, updateSession, generateSessionId } from './session-store'
-import type { Language } from '../lib/types'
+import type { Language, SessionMetadata } from '../lib/types'
 
 interface ChatHandlerOptions {
   knowledgePath?: string
@@ -31,8 +31,12 @@ export function createChatHandler(options?: ChatHandlerOptions) {
         )
       }
 
+      const userAgent = req.headers.get('user-agent') || ''
+      const country = req.headers.get('x-vercel-ip-country') || ''
+      const city = req.headers.get('x-vercel-ip-city') || ''
+
       const body = await req.json()
-      const { messages, sessionId: incomingSessionId } = body
+      const { messages, sessionId: incomingSessionId, metadata: clientMetadata } = body
 
       if (!messages || !Array.isArray(messages) || messages.length === 0) {
         return Response.json({ error: 'invalid_messages' }, { status: 400 })
@@ -58,7 +62,21 @@ export function createChatHandler(options?: ChatHandlerOptions) {
 
       if (!session) {
         sessionId = generateSessionId()
-        session = await createSession(sessionId)
+        const { device, browser, os } = parseUserAgent(userAgent)
+        const metadata: SessionMetadata = {
+          page_url: clientMetadata?.page_url,
+          referrer: clientMetadata?.referrer,
+          ip,
+          user_agent: userAgent,
+          device,
+          browser,
+          os,
+          country: country || undefined,
+          city: city || undefined,
+          visit_count: clientMetadata?.visit_count || 1,
+          first_visit_at: clientMetadata?.first_visit_at,
+        }
+        session = await createSession(sessionId, metadata)
         await recordSession()
       }
 
@@ -75,12 +93,14 @@ export function createChatHandler(options?: ChatHandlerOptions) {
       }
 
       // 사용자 메시지 저장
+      const now = new Date().toISOString()
       if (lastUserText) {
         await addMessage(sessionId, {
           role: 'user',
           content: lastUserText,
-          timestamp: new Date().toISOString(),
+          timestamp: now,
         })
+        await updateSession(sessionId, { last_message_at: now })
       }
 
       // 언어 감지
@@ -209,4 +229,29 @@ function detectLanguage(text: string): Language {
     return 'ko'
   }
   return 'en'
+}
+
+function parseUserAgent(ua: string): { device: string; browser: string; os: string } {
+  // Device
+  let device = 'desktop'
+  if (/tablet|ipad/i.test(ua)) device = 'tablet'
+  else if (/mobile|iphone|android.*mobile/i.test(ua)) device = 'mobile'
+
+  // Browser
+  let browser = 'Unknown'
+  if (/edg\//i.test(ua)) browser = 'Edge'
+  else if (/chrome|crios/i.test(ua)) browser = 'Chrome'
+  else if (/firefox|fxios/i.test(ua)) browser = 'Firefox'
+  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari'
+  else if (/opera|opr\//i.test(ua)) browser = 'Opera'
+
+  // OS
+  let os = 'Unknown'
+  if (/windows/i.test(ua)) os = 'Windows'
+  else if (/macintosh|mac os/i.test(ua)) os = 'macOS'
+  else if (/iphone|ipad|ipod/i.test(ua)) os = 'iOS'
+  else if (/android/i.test(ua)) os = 'Android'
+  else if (/linux/i.test(ua)) os = 'Linux'
+
+  return { device, browser, os }
 }

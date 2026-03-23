@@ -324,8 +324,11 @@ function createChatHandler(options) {
           { status: 429 }
         );
       }
+      const userAgent = req.headers.get("user-agent") || "";
+      const country = req.headers.get("x-vercel-ip-country") || "";
+      const city = req.headers.get("x-vercel-ip-city") || "";
       const body = await req.json();
-      const { messages, sessionId: incomingSessionId } = body;
+      const { messages, sessionId: incomingSessionId, metadata: clientMetadata } = body;
       if (!messages || !Array.isArray(messages) || messages.length === 0) {
         return Response.json({ error: "invalid_messages" }, { status: 400 });
       }
@@ -344,7 +347,21 @@ function createChatHandler(options) {
       let session = sessionId ? await getSession(sessionId) : null;
       if (!session) {
         sessionId = generateSessionId();
-        session = await createSession(sessionId);
+        const { device, browser, os } = parseUserAgent(userAgent);
+        const metadata = {
+          page_url: clientMetadata == null ? void 0 : clientMetadata.page_url,
+          referrer: clientMetadata == null ? void 0 : clientMetadata.referrer,
+          ip,
+          user_agent: userAgent,
+          device,
+          browser,
+          os,
+          country: country || void 0,
+          city: city || void 0,
+          visit_count: (clientMetadata == null ? void 0 : clientMetadata.visit_count) || 1,
+          first_visit_at: clientMetadata == null ? void 0 : clientMetadata.first_visit_at
+        };
+        session = await createSession(sessionId, metadata);
         await recordSession();
       }
       if (session.message_count >= config.limits.max_messages_per_session) {
@@ -357,12 +374,14 @@ function createChatHandler(options) {
           { status: 429 }
         );
       }
+      const now = (/* @__PURE__ */ new Date()).toISOString();
       if (lastUserText) {
         await addMessage(sessionId, {
           role: "user",
           content: lastUserText,
-          timestamp: (/* @__PURE__ */ new Date()).toISOString()
+          timestamp: now
         });
+        await updateSession(sessionId, { last_message_at: now });
       }
       const language = detectLanguage(lastUserText || "");
       if (session.language !== language) {
@@ -461,6 +480,24 @@ function detectLanguage(text) {
     return "ko";
   }
   return "en";
+}
+function parseUserAgent(ua) {
+  let device = "desktop";
+  if (/tablet|ipad/i.test(ua)) device = "tablet";
+  else if (/mobile|iphone|android.*mobile/i.test(ua)) device = "mobile";
+  let browser = "Unknown";
+  if (/edg\//i.test(ua)) browser = "Edge";
+  else if (/chrome|crios/i.test(ua)) browser = "Chrome";
+  else if (/firefox|fxios/i.test(ua)) browser = "Firefox";
+  else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = "Safari";
+  else if (/opera|opr\//i.test(ua)) browser = "Opera";
+  let os = "Unknown";
+  if (/windows/i.test(ua)) os = "Windows";
+  else if (/macintosh|mac os/i.test(ua)) os = "macOS";
+  else if (/iphone|ipad|ipod/i.test(ua)) os = "iOS";
+  else if (/android/i.test(ua)) os = "Android";
+  else if (/linux/i.test(ua)) os = "Linux";
+  return { device, browser, os };
 }
 
 // src/api/config-handler.ts

@@ -95,6 +95,19 @@ interface ChatMessage {
     timestamp: string;
     follow_up_questions?: string[];
 }
+interface SessionMetadata {
+    page_url?: string;
+    referrer?: string;
+    ip?: string;
+    user_agent?: string;
+    device?: string;
+    browser?: string;
+    os?: string;
+    country?: string;
+    city?: string;
+    visit_count?: number;
+    first_visit_at?: string;
+}
 interface ChatSession {
     session_id: string;
     created_at: string;
@@ -104,15 +117,13 @@ interface ChatSession {
     converted_to: 'email' | 'get-started' | null;
     messages: ChatMessage[];
     email_submitted: string | null;
-    metadata: {
-        page_url?: string;
-        referrer?: string;
-    };
+    metadata: SessionMetadata;
     cost_usd: number;
+    last_message_at?: string;
 }
 type Language = 'en' | 'ko';
 interface FollowUpSuggestions {
     follow_up_questions: string[];
 }
 
-export type { AppConfig as A, BotConfig as B, CTAButton as C, EmailFormConfig as E, FollowUpSuggestions as F, Language as L, PresetQuestion as P, SecurityConfig as S, CTAConfig as a, ChatMessage as b, ChatSession as c, CostSafetyConfig as d, EmailFormField as e, LimitsConfig as f, ServiceConfig as g };
+export type { AppConfig as A, BotConfig as B, CTAButton as C, EmailFormConfig as E, FollowUpSuggestions as F, Language as L, PresetQuestion as P, SecurityConfig as S, CTAConfig as a, ChatMessage as b, ChatSession as c, CostSafetyConfig as d, EmailFormField as e, LimitsConfig as f, ServiceConfig as g, SessionMetadata as h };

@@ -15,6 +15,7 @@ export type {
   ServiceConfig,
   ChatMessage,
   ChatSession,
+  SessionMetadata,
   Language,
   FollowUpSuggestions,
 } from './lib/types'

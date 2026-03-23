@@ -1,5 +1,5 @@
 import { createClient } from 'redis'
-import type { ChatSession, ChatMessage } from '../lib/types'
+import type { ChatSession, ChatMessage, SessionMetadata } from '../lib/types'
 
 // Phase 2: Redis (Upstash) 기반 세션 저장
 // 세션 키: chat:session:{sessionId}
@@ -38,7 +38,7 @@ export async function getSession(sessionId: string): Promise<ChatSession | null>
   return JSON.parse(data) as ChatSession
 }
 
-export async function createSession(sessionId: string, metadata?: { page_url?: string; referrer?: string }): Promise<ChatSession> {
+export async function createSession(sessionId: string, metadata?: SessionMetadata): Promise<ChatSession> {
   const redis = await getClient()
   const session: ChatSession = {
     session_id: sessionId,

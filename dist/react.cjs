@@ -213,6 +213,8 @@ function getTextFromMessage(message) {
   return "";
 }
 var SESSION_STORAGE_KEY = "channeltalk_session_id";
+var VISIT_COUNT_KEY = "channeltalk_visit_count";
+var FIRST_VISIT_KEY = "channeltalk_first_visit";
 function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
   var _a;
   const [isOpen, setIsOpen] = (0, import_react2.useState)(false);
@@ -276,11 +278,31 @@ function ChatWidget({ config, apiEndpoint = "/api/chat" }) {
       } else {
         setLanguage("en");
       }
-      setMessageCount((c) => c + 1);
-      sendMessage({
-        text
-      }, {
-        body: { sessionId }
+      setMessageCount((c) => {
+        const newCount = c + 1;
+        if (newCount === 1) {
+          const prevCount = parseInt(localStorage.getItem(VISIT_COUNT_KEY) || "0", 10);
+          const visitCount = prevCount + 1;
+          localStorage.setItem(VISIT_COUNT_KEY, String(visitCount));
+          if (!localStorage.getItem(FIRST_VISIT_KEY)) {
+            localStorage.setItem(FIRST_VISIT_KEY, (/* @__PURE__ */ new Date()).toISOString());
+          }
+          const firstVisitAt = localStorage.getItem(FIRST_VISIT_KEY) || void 0;
+          sendMessage({ text }, {
+            body: {
+              sessionId,
+              metadata: {
+                page_url: window.location.href,
+                referrer: document.referrer || void 0,
+                visit_count: visitCount,
+                first_visit_at: firstVisitAt
+              }
+            }
+          });
+        } else {
+          sendMessage({ text }, { body: { sessionId } });
+        }
+        return newCount;
       });
     },
     [sendMessage, sessionId]
@@ -556,62 +578,219 @@ function ChatList({ sessions, selectedId, onSelect }) {
 // src/components/admin/ChatDetail.tsx
 var import_jsx_runtime9 = require("react/jsx-runtime");
 function ChatDetail({ session }) {
-  return /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "p-4", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "mb-4 pb-4 border-b border-gray-100", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "flex items-center gap-2 mb-2", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("h2", { className: "text-sm font-semibold text-gray-800", children: [
-          "Session ",
-          session.session_id
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(Badge, { variant: "outline", className: "text-xs", children: session.language.toUpperCase() })
-      ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("div", { className: "text-xs text-gray-500 space-y-0.5", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("p", { children: [
-          "Started: ",
-          new Date(session.created_at).toLocaleString()
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("p", { children: [
-          "Messages: ",
-          session.message_count,
-          " \xB7 Unanswered: ",
-          session.fallback_count
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("p", { children: [
-          "Cost: $",
-          session.cost_usd.toFixed(4)
-        ] }),
-        session.email_submitted && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("p", { children: [
-          "Email: ",
-          session.email_submitted
-        ] }),
-        session.converted_to && /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)("p", { children: [
-          "Converted: ",
-          session.converted_to
-        ] })
-      ] })
-    ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "space-y-3", children: session.messages.map((msg, i) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
-      "div",
-      {
-        className: `flex ${msg.role === "user" ? "justify-end" : "justify-start"}`,
-        children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
-          "div",
+  return /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "p-4", children: /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("div", { className: "space-y-3", children: session.messages.map((msg, i) => /* @__PURE__ */ (0, import_jsx_runtime9.jsx)(
+    "div",
+    {
+      className: `flex ${msg.role === "user" ? "justify-end" : "justify-start"}`,
+      children: /* @__PURE__ */ (0, import_jsx_runtime9.jsxs)(
+        "div",
+        {
+          className: `max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${msg.role === "user" ? "bg-indigo-600 text-white rounded-br-md" : "bg-gray-100 text-gray-900 rounded-bl-md"}`,
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "whitespace-pre-wrap", children: msg.content.replace(/```json\s*\n?[\s\S]*?\n?\s*```/g, "").trim() }),
+            /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "text-xs opacity-60 mt-1", children: new Date(msg.timestamp).toLocaleTimeString() })
+          ]
+        }
+      )
+    },
+    i
+  )) }) });
+}
+
+// src/lib/csv-export.ts
+function escapeCsvField(value) {
+  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+function downloadCsv(filename, csvContent) {
+  const bom = "\uFEFF";
+  const blob = new Blob([bom + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+function downloadSessionCsv(session) {
+  const header = "timestamp,role,content";
+  const rows = session.messages.map(
+    (msg) => [
+      msg.timestamp,
+      msg.role,
+      escapeCsvField(msg.content.replace(/```json\s*\n?[\s\S]*?\n?\s*```/g, "").trim())
+    ].join(",")
+  );
+  const csv = [header, ...rows].join("\n");
+  downloadCsv(`chat_${session.session_id}.csv`, csv);
+}
+function downloadAllSessionsCsv(sessions) {
+  const header = [
+    "session_id",
+    "created_at",
+    "language",
+    "email",
+    "country",
+    "city",
+    "device",
+    "browser",
+    "os",
+    "page_url",
+    "referrer",
+    "visit_count",
+    "message_count",
+    "fallback_count",
+    "converted_to",
+    "cost_usd"
+  ].join(",");
+  const rows = sessions.map((s) => {
+    const m = s.metadata || {};
+    return [
+      s.session_id,
+      s.created_at,
+      s.language,
+      escapeCsvField(s.email_submitted || ""),
+      m.country || "",
+      m.city || "",
+      m.device || "",
+      m.browser || "",
+      m.os || "",
+      escapeCsvField(m.page_url || ""),
+      escapeCsvField(m.referrer || ""),
+      m.visit_count || "",
+      s.message_count,
+      s.fallback_count,
+      s.converted_to || "",
+      s.cost_usd.toFixed(4)
+    ].join(",");
+  });
+  const csv = [header, ...rows].join("\n");
+  const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  downloadCsv(`sessions_${date}.csv`, csv);
+}
+
+// src/components/admin/SessionInfo.tsx
+var import_jsx_runtime10 = require("react/jsx-runtime");
+function formatDuration(startIso, endIso) {
+  if (!endIso) return "-";
+  const ms = new Date(endIso).getTime() - new Date(startIso).getTime();
+  if (ms < 0) return "-";
+  const totalSeconds = Math.floor(ms / 1e3);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes === 0) return `${seconds}\uCD08`;
+  return `${minutes}\uBD84 ${seconds}\uCD08`;
+}
+function getLastMessageTime(session) {
+  if (session.last_message_at) return session.last_message_at;
+  const msgs = session.messages;
+  if (msgs.length > 0) return msgs[msgs.length - 1].timestamp;
+  return void 0;
+}
+function InfoRow({ label, value }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "flex justify-between py-1.5 text-sm", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-gray-500", children: label }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("span", { className: "text-gray-900 font-medium text-right max-w-[60%] truncate", children: value || "-" })
+  ] });
+}
+function SessionInfo({ session }) {
+  const meta = session.metadata || {};
+  const lastMsg = getLastMessageTime(session);
+  const duration = formatDuration(session.created_at, lastMsg);
+  const visitLabel = meta.visit_count ? meta.visit_count === 1 ? "\uCCAB \uBC29\uBB38" : `\uC7AC\uBC29\uBB38 (${meta.visit_count}\uD68C\uC9F8)` : "-";
+  const locationLabel = [meta.country, meta.city].filter(Boolean).join(" \xB7 ") || void 0;
+  const deviceLabel = [meta.device, meta.browser, meta.os].filter(Boolean).join(" / ") || void 0;
+  let pageLabel = meta.page_url;
+  if (pageLabel) {
+    try {
+      pageLabel = new URL(pageLabel).pathname;
+    } catch (e) {
+    }
+  }
+  let referrerLabel = meta.referrer;
+  if (referrerLabel) {
+    try {
+      referrerLabel = new URL(referrerLabel).hostname;
+    } catch (e) {
+    }
+  }
+  return /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "p-4 space-y-4", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { className: "text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2", children: "\uACE0\uAC1D \uC815\uBCF4" }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "divide-y divide-gray-50", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(InfoRow, { label: "\uC774\uBA54\uC77C", value: session.email_submitted }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(InfoRow, { label: "\uAD6D\uAC00 / \uB3C4\uC2DC", value: locationLabel }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(InfoRow, { label: "\uAE30\uAE30 / \uBE0C\uB77C\uC6B0\uC800", value: deviceLabel }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(InfoRow, { label: "\uC811\uC18D \uD398\uC774\uC9C0", value: pageLabel }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(InfoRow, { label: "\uC720\uC785 \uACBD\uB85C", value: referrerLabel }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(InfoRow, { label: "\uBC29\uBB38 \uC774\uB825", value: visitLabel }),
+        meta.first_visit_at && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          InfoRow,
           {
-            className: `max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${msg.role === "user" ? "bg-indigo-600 text-white rounded-br-md" : "bg-gray-100 text-gray-900 rounded-bl-md"}`,
-            children: [
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "whitespace-pre-wrap", children: msg.content.replace(/```json\s*\n?[\s\S]*?\n?\s*```/g, "").trim() }),
-              /* @__PURE__ */ (0, import_jsx_runtime9.jsx)("p", { className: "text-xs opacity-60 mt-1", children: new Date(msg.timestamp).toLocaleTimeString() })
-            ]
+            label: "\uCD5C\uCD08 \uBC29\uBB38",
+            value: new Date(meta.first_visit_at).toLocaleDateString()
           }
         )
-      },
-      i
-    )) })
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("h3", { className: "text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2", children: "\uC138\uC158 \uD1B5\uACC4" }),
+      /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "divide-y divide-gray-50", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          InfoRow,
+          {
+            label: "\uC2DC\uC791",
+            value: new Date(session.created_at).toLocaleString()
+          }
+        ),
+        lastMsg && /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          InfoRow,
+          {
+            label: "\uB9C8\uC9C0\uB9C9 \uBA54\uC2DC\uC9C0",
+            value: new Date(lastMsg).toLocaleString()
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(InfoRow, { label: "\uC9C0\uC18D \uC2DC\uAC04", value: duration }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          InfoRow,
+          {
+            label: "\uBA54\uC2DC\uC9C0",
+            value: `${session.message_count}\uAC1C (\uC0AC\uC6A9\uC790) / ${session.messages.length}\uAC1C (\uC804\uCCB4)`
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(InfoRow, { label: "\uD3F4\uBC31", value: `${session.fallback_count}\uD68C` }),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(
+          InfoRow,
+          {
+            label: "\uC804\uD658",
+            value: session.converted_to ? `\u2705 ${session.converted_to}` : "\uC5C6\uC74C"
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime10.jsx)(InfoRow, { label: "\uBE44\uC6A9", value: `$${session.cost_usd.toFixed(4)}` })
+      ] })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)(
+      "button",
+      {
+        onClick: () => downloadSessionCsv(session),
+        className: "w-full py-2.5 px-4 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors flex items-center justify-center gap-2",
+        children: [
+          /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("svg", { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("polyline", { points: "7 10 12 15 17 10" }),
+            /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("line", { x1: "12", y1: "15", x2: "12", y2: "3" })
+          ] }),
+          "\uC774 \uC138\uC158 CSV \uB2E4\uC6B4\uB85C\uB4DC"
+        ]
+      }
+    )
   ] });
 }
 
 // src/components/admin/UnansweredList.tsx
-var import_jsx_runtime10 = require("react/jsx-runtime");
+var import_jsx_runtime11 = require("react/jsx-runtime");
 function UnansweredList({ sessions }) {
   const unansweredQuestions = [];
   for (const session of sessions) {
@@ -633,15 +812,15 @@ function UnansweredList({ sessions }) {
     }
   }
   if (!unansweredQuestions.length) {
-    return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("p", { className: "text-gray-500 text-sm p-4", children: "No unanswered questions found." });
+    return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-gray-500 text-sm p-4", children: "No unanswered questions found." });
   }
-  return /* @__PURE__ */ (0, import_jsx_runtime10.jsx)("div", { className: "divide-y divide-gray-100", children: unansweredQuestions.map((item, i) => /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("div", { className: "px-4 py-3", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("p", { className: "text-sm text-gray-800", children: [
+  return /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "divide-y divide-gray-100", children: unansweredQuestions.map((item, i) => /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "px-4 py-3", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { className: "text-sm text-gray-800", children: [
       "\u201C",
       item.question,
       "\u201D"
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime10.jsxs)("p", { className: "text-xs text-gray-400 mt-1", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { className: "text-xs text-gray-400 mt-1", children: [
       new Date(item.date).toLocaleString(),
       " \xB7 ",
       item.sessionId
@@ -650,7 +829,7 @@ function UnansweredList({ sessions }) {
 }
 
 // src/components/admin/AdminDashboard.tsx
-var import_jsx_runtime11 = require("react/jsx-runtime");
+var import_jsx_runtime12 = require("react/jsx-runtime");
 function AdminDashboard({ password, apiEndpoint = "/api/admin/sessions" }) {
   const [sessions, setSessions] = (0, import_react5.useState)([]);
   const [selectedSession, setSelectedSession] = (0, import_react5.useState)(null);
@@ -678,9 +857,26 @@ function AdminDashboard({ password, apiEndpoint = "/api/admin/sessions" }) {
     { key: "unanswered", label: "Unanswered" },
     { key: "cost", label: "Cost" }
   ];
-  return /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "min-h-screen bg-gray-50", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("header", { className: "bg-white border-b border-gray-200 px-6 py-4", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h1", { className: "text-xl font-bold text-gray-900", children: "Admin Dashboard" }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "bg-white border-b border-gray-200 px-6", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "flex gap-6", children: tabs.map((t) => /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "min-h-screen bg-gray-50", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("header", { className: "bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h1", { className: "text-xl font-bold text-gray-900", children: "Admin Dashboard" }),
+      tab === "conversations" && sessions.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+        "button",
+        {
+          onClick: () => downloadAllSessionsCsv(sessions),
+          className: "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors",
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("path", { d: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("polyline", { points: "7 10 12 15 17 10" }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("line", { x1: "12", y1: "15", x2: "12", y2: "3" })
+            ] }),
+            "CSV \uC804\uCCB4 \uB2E4\uC6B4\uB85C\uB4DC"
+          ]
+        }
+      )
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "bg-white border-b border-gray-200 px-6", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "flex gap-6", children: tabs.map((t) => /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
       "button",
       {
         onClick: () => {
@@ -693,15 +889,15 @@ function AdminDashboard({ password, apiEndpoint = "/api/admin/sessions" }) {
       },
       t.key
     )) }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "max-w-7xl mx-auto p-6", children: [
-      tab === "conversations" && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-6", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("h2", { className: "text-sm font-semibold text-gray-700", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "max-w-[1400px] mx-auto p-6", children: [
+      tab === "conversations" && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-[280px_1fr] xl:grid-cols-[280px_1fr_300px] gap-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("h2", { className: "text-sm font-semibold text-gray-700", children: [
             "Conversations (",
             sessions.length,
             ")"
           ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "max-h-[calc(100vh-250px)] overflow-y-auto", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "max-h-[calc(100vh-220px)] overflow-y-auto", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
             ChatList,
             {
               sessions,
@@ -710,36 +906,40 @@ function AdminDashboard({ password, apiEndpoint = "/api/admin/sessions" }) {
             }
           ) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h2", { className: "text-sm font-semibold text-gray-700", children: "Detail" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("div", { className: "max-h-[calc(100vh-250px)] overflow-y-auto", children: selectedSession ? /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(ChatDetail, { session: selectedSession }) : /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-gray-500 text-sm p-4", children: "Select a conversation to view details." }) })
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h2", { className: "text-sm font-semibold text-gray-700", children: "Detail" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "max-h-[calc(100vh-220px)] overflow-y-auto", children: selectedSession ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ChatDetail, { session: selectedSession }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-gray-500 text-sm p-4", children: "Select a conversation to view details." }) })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h2", { className: "text-sm font-semibold text-gray-700", children: "Session Info" }) }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "max-h-[calc(100vh-220px)] overflow-y-auto", children: selectedSession ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(SessionInfo, { session: selectedSession }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-gray-500 text-sm p-4", children: "Select a conversation to view session info." }) })
         ] })
       ] }),
-      tab === "unanswered" && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "px-4 py-3 border-b border-gray-100", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("h2", { className: "text-sm font-semibold text-gray-700", children: "Unanswered Questions" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-xs text-gray-400 mt-0.5", children: "Add these to knowledge.md to improve your chatbot" })
+      tab === "unanswered" && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "px-4 py-3 border-b border-gray-100", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h2", { className: "text-sm font-semibold text-gray-700", children: "Unanswered Questions" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-xs text-gray-400 mt-0.5", children: "Add these to knowledge.md to improve your chatbot" })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsx)(UnansweredList, { sessions })
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(UnansweredList, { sessions })
       ] }),
-      tab === "cost" && /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-4", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 p-6", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm text-gray-500", children: "Today's Cost" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { className: "text-2xl font-bold text-gray-900 mt-1", children: [
+      tab === "cost" && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "grid grid-cols-1 md:grid-cols-3 gap-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 p-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-sm text-gray-500", children: "Today's Cost" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("p", { className: "text-2xl font-bold text-gray-900 mt-1", children: [
             "$",
             costStats.dailyCost.toFixed(4)
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 p-6", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm text-gray-500", children: "Monthly Cost" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("p", { className: "text-2xl font-bold text-gray-900 mt-1", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 p-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-sm text-gray-500", children: "Monthly Cost" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("p", { className: "text-2xl font-bold text-gray-900 mt-1", children: [
             "$",
             costStats.monthlyCost.toFixed(4)
           ] })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime11.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 p-6", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-sm text-gray-500", children: "Today's Sessions" }),
-          /* @__PURE__ */ (0, import_jsx_runtime11.jsx)("p", { className: "text-2xl font-bold text-gray-900 mt-1", children: costStats.dailySessions })
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 p-6", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-sm text-gray-500", children: "Today's Sessions" }),
+          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-2xl font-bold text-gray-900 mt-1", children: costStats.dailySessions })
         ] })
       ] })
     ] })
@@ -748,7 +948,7 @@ function AdminDashboard({ password, apiEndpoint = "/api/admin/sessions" }) {
 
 // src/components/admin/AdminLogin.tsx
 var import_react6 = require("react");
-var import_jsx_runtime12 = require("react/jsx-runtime");
+var import_jsx_runtime13 = require("react/jsx-runtime");
 function AdminLogin({ onLogin }) {
   const [password, setPassword] = (0, import_react6.useState)("");
   const [error, setError] = (0, import_react6.useState)(false);
@@ -763,9 +963,9 @@ function AdminLogin({ onLogin }) {
       setError(true);
     }
   };
-  return /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "min-h-screen flex items-center justify-center bg-gray-50", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("form", { onSubmit: handleSubmit, className: "bg-white p-8 rounded-xl shadow-md w-80", children: [
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h1", { className: "text-xl font-bold mb-6 text-center", children: "Admin Login" }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+  return /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("div", { className: "min-h-screen flex items-center justify-center bg-gray-50", children: /* @__PURE__ */ (0, import_jsx_runtime13.jsxs)("form", { onSubmit: handleSubmit, className: "bg-white p-8 rounded-xl shadow-md w-80", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("h1", { className: "text-xl font-bold mb-6 text-center", children: "Admin Login" }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       "input",
       {
         type: "password",
@@ -778,8 +978,8 @@ function AdminLogin({ onLogin }) {
         className: "w-full px-3 py-2 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500"
       }
     ),
-    error && /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-red-500 text-sm mb-4", children: "Incorrect password" }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+    error && /* @__PURE__ */ (0, import_jsx_runtime13.jsx)("p", { className: "text-red-500 text-sm mb-4", children: "Incorrect password" }),
+    /* @__PURE__ */ (0, import_jsx_runtime13.jsx)(
       "button",
       {
         type: "submit",

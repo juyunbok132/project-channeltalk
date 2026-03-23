@@ -1,5 +1,5 @@
-import { A as AppConfig } from './types-DNVhhEoE.js';
-export { B as BotConfig, C as CTAButton, a as CTAConfig, b as ChatMessage, c as ChatSession, d as CostSafetyConfig, E as EmailFormConfig, e as EmailFormField, F as FollowUpSuggestions, L as Language, f as LimitsConfig, P as PresetQuestion, S as SecurityConfig, g as ServiceConfig } from './types-DNVhhEoE.js';
+import { A as AppConfig } from './types-Bw74UrpG.js';
+export { B as BotConfig, C as CTAButton, a as CTAConfig, b as ChatMessage, c as ChatSession, d as CostSafetyConfig, E as EmailFormConfig, e as EmailFormField, F as FollowUpSuggestions, L as Language, f as LimitsConfig, P as PresetQuestion, S as SecurityConfig, g as ServiceConfig, h as SessionMetadata } from './types-Bw74UrpG.js';
 
 declare function loadConfig(configPath?: string): AppConfig;
 declare function clearConfigCache(): void;

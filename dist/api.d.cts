@@ -1,4 +1,4 @@
-import { b as ChatMessage, c as ChatSession } from './types-DNVhhEoE.cjs';
+import { b as ChatMessage, c as ChatSession } from './types-Bw74UrpG.cjs';
 
 interface ChatHandlerOptions {
     knowledgePath?: string;

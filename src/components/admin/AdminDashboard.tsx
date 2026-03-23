@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ChatList } from './ChatList'
 import { ChatDetail } from './ChatDetail'
+import { SessionInfo } from './SessionInfo'
 import { UnansweredList } from './UnansweredList'
+import { downloadAllSessionsCsv } from '../../lib/csv-export'
 import type { ChatSession } from '../../lib/types'
 
 interface AdminDashboardProps {
@@ -49,8 +51,21 @@ export function AdminDashboard({ password, apiEndpoint = '/api/admin/sessions' }
   return (
     <div className="min-h-screen bg-gray-50">
       {/* 헤더 */}
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
+      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <h1 className="text-xl font-bold text-gray-900">Admin Dashboard</h1>
+        {tab === 'conversations' && sessions.length > 0 && (
+          <button
+            onClick={() => downloadAllSessionsCsv(sessions)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            CSV 전체 다운로드
+          </button>
+        )}
       </header>
 
       {/* 탭 */}
@@ -77,9 +92,9 @@ export function AdminDashboard({ password, apiEndpoint = '/api/admin/sessions' }
       </div>
 
       {/* 콘텐츠 */}
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-[1400px] mx-auto p-6">
         {tab === 'conversations' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] xl:grid-cols-[280px_1fr_300px] gap-4">
             {/* 대화 목록 */}
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100">
@@ -87,7 +102,7 @@ export function AdminDashboard({ password, apiEndpoint = '/api/admin/sessions' }
                   Conversations ({sessions.length})
                 </h2>
               </div>
-              <div className="max-h-[calc(100vh-250px)] overflow-y-auto">
+              <div className="max-h-[calc(100vh-220px)] overflow-y-auto">
                 <ChatList
                   sessions={sessions}
                   selectedId={selectedSession?.session_id || null}
@@ -101,12 +116,28 @@ export function AdminDashboard({ password, apiEndpoint = '/api/admin/sessions' }
               <div className="px-4 py-3 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-700">Detail</h2>
               </div>
-              <div className="max-h-[calc(100vh-250px)] overflow-y-auto">
+              <div className="max-h-[calc(100vh-220px)] overflow-y-auto">
                 {selectedSession ? (
                   <ChatDetail session={selectedSession} />
                 ) : (
                   <p className="text-gray-500 text-sm p-4">
                     Select a conversation to view details.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* 세션 정보 패널 */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <h2 className="text-sm font-semibold text-gray-700">Session Info</h2>
+              </div>
+              <div className="max-h-[calc(100vh-220px)] overflow-y-auto">
+                {selectedSession ? (
+                  <SessionInfo session={selectedSession} />
+                ) : (
+                  <p className="text-gray-500 text-sm p-4">
+                    Select a conversation to view session info.
                   </p>
                 )}
               </div>

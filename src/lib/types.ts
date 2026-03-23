@@ -96,6 +96,20 @@ export interface ChatMessage {
   follow_up_questions?: string[]
 }
 
+export interface SessionMetadata {
+  page_url?: string
+  referrer?: string
+  ip?: string
+  user_agent?: string
+  device?: string    // 'mobile' | 'tablet' | 'desktop'
+  browser?: string   // 'Chrome' | 'Safari' | 'Firefox' 등
+  os?: string        // 'Windows' | 'macOS' | 'iOS' | 'Android' 등
+  country?: string   // 국가 코드 (KR, US 등) — Vercel 헤더
+  city?: string      // 도시 (Seoul 등) — Vercel 헤더
+  visit_count?: number    // 방문 횟수 (1 = 첫 방문, 2+ = 재방문)
+  first_visit_at?: string // 최초 방문 시각
+}
+
 export interface ChatSession {
   session_id: string
   created_at: string
@@ -105,11 +119,9 @@ export interface ChatSession {
   converted_to: 'email' | 'get-started' | null
   messages: ChatMessage[]
   email_submitted: string | null
-  metadata: {
-    page_url?: string
-    referrer?: string
-  }
+  metadata: SessionMetadata
   cost_usd: number
+  last_message_at?: string
 }
 
 export type Language = 'en' | 'ko'
