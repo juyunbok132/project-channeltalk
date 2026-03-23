@@ -237,14 +237,10 @@ export function ChatWidget({ config, apiEndpoint = '/api/chat' }: ChatWidgetProp
                   language={language}
                   brandColor={config.brand_color}
                   onSubmit={(data) => {
-                    fetch('/api/chat', {
+                    fetch('/api/chat-email', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        sessionId,
-                        type: 'email_submit',
-                        data,
-                      }),
+                      body: JSON.stringify(data),
                     })
                   }}
                 />
