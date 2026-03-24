@@ -120,7 +120,6 @@ var PRICING = {
   cache_write: 1.25,
   cache_read: 0.1
 };
-var requestsPerMinute = /* @__PURE__ */ new Map();
 var client = null;
 async function getClient() {
   if (!client) {
@@ -191,13 +190,15 @@ async function checkBudget(config, ip) {
   }
   if (ip) {
     const now = Date.now();
-    const timestamps = requestsPerMinute.get(ip) || [];
-    const recentTimestamps = timestamps.filter((t) => now - t < 6e4);
-    if (recentTimestamps.length >= config.rate_limit_per_minute) {
+    const rateKey = `rate:${ip}`;
+    const windowStart = now - 6e4;
+    await redis.zRemRangeByScore(rateKey, 0, windowStart);
+    const count = await redis.zCard(rateKey);
+    if (count >= config.rate_limit_per_minute) {
       return { allowed: false, reason: "rate_limit", dailyCost, monthlyCost };
     }
-    recentTimestamps.push(now);
-    requestsPerMinute.set(ip, recentTimestamps);
+    await redis.zAdd(rateKey, { score: now, value: `${now}` });
+    await redis.expire(rateKey, 120);
   }
   return { allowed: true, dailyCost, monthlyCost };
 }
@@ -217,6 +218,7 @@ async function getCostStats() {
 
 // src/api/session-store.ts
 import { createClient as createClient2 } from "redis";
+import { randomUUID } from "crypto";
 var SESSION_PREFIX = "chat:session:";
 var SESSION_INDEX = "chat:session_ids";
 var SESSION_TTL = 60 * 60 * 24 * 30;
@@ -232,10 +234,12 @@ async function getClient2() {
   }
   return client2;
 }
+var SESSION_ID_PATTERN = /^s_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 function generateSessionId() {
-  const date = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10).replace(/-/g, "");
-  const rand = Math.random().toString(36).slice(2, 8);
-  return `s_${date}_${rand}`;
+  return `s_${randomUUID()}`;
+}
+function isValidSessionId(id) {
+  return SESSION_ID_PATTERN.test(id) && id.length <= 64;
 }
 async function getSession(sessionId) {
   const redis = await getClient2();
@@ -315,6 +319,7 @@ function createChatHandler(options) {
   const knowledge = loadKnowledge(options == null ? void 0 : options.knowledgePath);
   const systemPromptText = buildSystemPrompt(config, knowledge);
   async function POST(req) {
+    var _a;
     try {
       const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
       const budgetCheck = await checkBudget(config.cost_safety, ip);
@@ -344,7 +349,18 @@ function createChatHandler(options) {
         }
       }
       let sessionId = incomingSessionId;
-      let session = sessionId ? await getSession(sessionId) : null;
+      let session = null;
+      if (sessionId) {
+        if (!isValidSessionId(sessionId)) {
+          sessionId = null;
+        } else {
+          session = await getSession(sessionId);
+          if (session && ((_a = session.metadata) == null ? void 0 : _a.ip) && session.metadata.ip !== ip) {
+            session = null;
+            sessionId = null;
+          }
+        }
+      }
       if (!session) {
         sessionId = generateSessionId();
         const { device, browser, os } = parseUserAgent(userAgent);
@@ -411,7 +427,7 @@ function createChatHandler(options) {
         ],
         messages: modelMessages,
         onFinish: async (event) => {
-          var _a, _b;
+          var _a2, _b;
           let responseText = event.text;
           responseText = filterOutput(responseText);
           let followUpQuestions = [];
@@ -441,7 +457,7 @@ function createChatHandler(options) {
             const cost = calculateCost({
               inputTokens: event.usage.inputTokens || 0,
               outputTokens: event.usage.outputTokens || 0,
-              cacheReadTokens: ((_a = event.usage.inputTokenDetails) == null ? void 0 : _a.cacheReadTokens) || 0,
+              cacheReadTokens: ((_a2 = event.usage.inputTokenDetails) == null ? void 0 : _a2.cacheReadTokens) || 0,
               cacheWriteTokens: ((_b = event.usage.inputTokenDetails) == null ? void 0 : _b.cacheWriteTokens) || 0
             });
             await recordCost(cost);
@@ -532,7 +548,12 @@ function createAdminHandler() {
     if (filter === "unanswered") {
       sessions = await getSessionsByFilter({ has_fallback: true });
     } else if (filter) {
-      sessions = await getSessionsByFilter(JSON.parse(filter));
+      try {
+        const parsed = JSON.parse(filter);
+        sessions = await getSessionsByFilter(parsed);
+      } catch (e) {
+        return Response.json({ error: "invalid_filter" }, { status: 400 });
+      }
     } else {
       sessions = await getAllSessions();
     }

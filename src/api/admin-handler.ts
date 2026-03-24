@@ -15,7 +15,12 @@ export function createAdminHandler() {
     if (filter === 'unanswered') {
       sessions = await getSessionsByFilter({ has_fallback: true })
     } else if (filter) {
-      sessions = await getSessionsByFilter(JSON.parse(filter))
+      try {
+        const parsed = JSON.parse(filter)
+        sessions = await getSessionsByFilter(parsed)
+      } catch {
+        return Response.json({ error: 'invalid_filter' }, { status: 400 })
+      }
     } else {
       sessions = await getAllSessions()
     }

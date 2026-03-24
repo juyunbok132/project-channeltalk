@@ -13,9 +13,7 @@ const PRICING = {
 // cost:daily:{YYYY-MM-DD} -> number (string)
 // cost:monthly:{YYYY-MM} -> number (string)
 // cost:sessions:{YYYY-MM-DD} -> number
-// Rate limiting은 인메모리 유지 (단기 데이터, Redis 호출 최소화)
-
-const requestsPerMinute = new Map<string, number[]>()
+// rate:{ip} -> sorted set (timestamps as score+member)
 
 // Redis 클라이언트 싱글턴
 let client: ReturnType<typeof createClient> | null = null
@@ -113,16 +111,23 @@ export async function checkBudget(config: CostSafetyConfig, ip?: string): Promis
     return { allowed: false, reason: 'session_limit', dailyCost, monthlyCost }
   }
 
-  // IP 기반 분당 제한 (인메모리 — 단기 데이터)
+  // IP 기반 분당 제한 (Redis sliding window)
   if (ip) {
     const now = Date.now()
-    const timestamps = requestsPerMinute.get(ip) || []
-    const recentTimestamps = timestamps.filter((t) => now - t < 60_000)
-    if (recentTimestamps.length >= config.rate_limit_per_minute) {
+    const rateKey = `rate:${ip}`
+    const windowStart = now - 60_000
+
+    // 1분보다 오래된 항목 제거 + 현재 윈도우 카운트 조회
+    await redis.zRemRangeByScore(rateKey, 0, windowStart)
+    const count = await redis.zCard(rateKey)
+
+    if (count >= config.rate_limit_per_minute) {
       return { allowed: false, reason: 'rate_limit', dailyCost, monthlyCost }
     }
-    recentTimestamps.push(now)
-    requestsPerMinute.set(ip, recentTimestamps)
+
+    // 현재 요청 기록 + TTL 2분 (자동 정리)
+    await redis.zAdd(rateKey, { score: now, value: `${now}` })
+    await redis.expire(rateKey, 120)
   }
 
   return { allowed: true, dailyCost, monthlyCost }

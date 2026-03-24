@@ -1,4 +1,5 @@
 import { createClient } from 'redis'
+import { randomUUID } from 'crypto'
 import type { ChatSession, ChatMessage, SessionMetadata } from '../lib/types'
 
 // Phase 2: Redis (Upstash) 기반 세션 저장
@@ -25,10 +26,15 @@ async function getClient() {
   return client
 }
 
+// 세션 ID 형식 검증 정규식
+const SESSION_ID_PATTERN = /^s_[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+
 export function generateSessionId(): string {
-  const date = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-  const rand = Math.random().toString(36).slice(2, 8)
-  return `s_${date}_${rand}`
+  return `s_${randomUUID()}`
+}
+
+export function isValidSessionId(id: string): boolean {
+  return SESSION_ID_PATTERN.test(id) && id.length <= 64
 }
 
 export async function getSession(sessionId: string): Promise<ChatSession | null> {

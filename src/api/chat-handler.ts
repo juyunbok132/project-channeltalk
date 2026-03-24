@@ -5,7 +5,7 @@ import { loadKnowledge } from '../lib/knowledge-loader'
 import { buildSystemPrompt } from './system-prompt'
 import { filterInput, filterOutput } from './input-filter'
 import { checkBudget, calculateCost, recordCost, recordSession } from './cost-tracker'
-import { getSession, createSession, addMessage, updateSession, generateSessionId } from './session-store'
+import { getSession, createSession, addMessage, updateSession, generateSessionId, isValidSessionId } from './session-store'
 import type { Language, SessionMetadata } from '../lib/types'
 
 interface ChatHandlerOptions {
@@ -56,9 +56,23 @@ export function createChatHandler(options?: ChatHandlerOptions) {
         }
       }
 
-      // 세션 관리
+      // 세션 관리 (H-5, H-6: 세션 ID 검증 + IP 바인딩)
       let sessionId = incomingSessionId
-      let session = sessionId ? await getSession(sessionId) : null
+      let session = null
+
+      if (sessionId) {
+        // H-6: 세션 ID 형식 검증
+        if (!isValidSessionId(sessionId)) {
+          sessionId = null
+        } else {
+          session = await getSession(sessionId)
+          // H-5: IP 바인딩 검증 — IP가 다르면 세션 무효화
+          if (session && session.metadata?.ip && session.metadata.ip !== ip) {
+            session = null
+            sessionId = null
+          }
+        }
+      }
 
       if (!session) {
         sessionId = generateSessionId()
