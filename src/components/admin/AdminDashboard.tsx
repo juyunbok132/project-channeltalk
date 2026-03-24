@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ChatList } from './ChatList'
 import { ChatDetail } from './ChatDetail'
 import { SessionInfo } from './SessionInfo'
@@ -15,11 +15,36 @@ interface AdminDashboardProps {
 
 type Tab = 'conversations' | 'unanswered' | 'cost'
 
+// 최소/최대 너비 (px)
+const MIN_LEFT = 220
+const MIN_CENTER = 300
+const MIN_RIGHT = 240
+
+function ResizeHandle({ onMouseDown }: { onMouseDown: (e: React.MouseEvent) => void }) {
+  return (
+    <div
+      onMouseDown={onMouseDown}
+      className="w-1.5 cursor-col-resize flex-shrink-0 group relative"
+    >
+      <div className="absolute inset-y-0 -left-1 -right-1" />
+      <div className="h-full w-0.5 mx-auto bg-gray-200 group-hover:bg-indigo-400 group-active:bg-indigo-600 transition-colors rounded-full" />
+    </div>
+  )
+}
+
 export function AdminDashboard({ password, apiEndpoint = '/api/admin/sessions' }: AdminDashboardProps) {
   const [sessions, setSessions] = useState<ChatSession[]>([])
   const [selectedSession, setSelectedSession] = useState<ChatSession | null>(null)
   const [tab, setTab] = useState<Tab>('conversations')
   const [costStats, setCostStats] = useState({ dailyCost: 0, monthlyCost: 0, dailySessions: 0 })
+
+  // 리사이즈 상태
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [leftWidth, setLeftWidth] = useState(280)
+  const [rightWidth, setRightWidth] = useState(320)
+  const dragging = useRef<'left' | 'right' | null>(null)
+  const dragStartX = useRef(0)
+  const dragStartWidth = useRef(0)
 
   const fetchSessions = useCallback(
     async (filter?: string) => {
@@ -41,6 +66,43 @@ export function AdminDashboard({ password, apiEndpoint = '/api/admin/sessions' }
   useEffect(() => {
     fetchSessions()
   }, [fetchSessions])
+
+  // 드래그 핸들러
+  const handleMouseDown = useCallback((side: 'left' | 'right', e: React.MouseEvent) => {
+    e.preventDefault()
+    dragging.current = side
+    dragStartX.current = e.clientX
+    dragStartWidth.current = side === 'left' ? leftWidth : rightWidth
+  }, [leftWidth, rightWidth])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragging.current || !containerRef.current) return
+      const containerWidth = containerRef.current.offsetWidth
+      const delta = e.clientX - dragStartX.current
+
+      if (dragging.current === 'left') {
+        const newLeft = Math.max(MIN_LEFT, dragStartWidth.current + delta)
+        const maxLeft = containerWidth - rightWidth - MIN_CENTER - 12 // 12 = handle widths
+        setLeftWidth(Math.min(newLeft, maxLeft))
+      } else {
+        const newRight = Math.max(MIN_RIGHT, dragStartWidth.current - delta)
+        const maxRight = containerWidth - leftWidth - MIN_CENTER - 12
+        setRightWidth(Math.min(newRight, maxRight))
+      }
+    }
+
+    const handleMouseUp = () => {
+      dragging.current = null
+    }
+
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [leftWidth, rightWidth])
 
   const tabs: { key: Tab; label: string }[] = [
     { key: 'conversations', label: 'Conversations' },
@@ -92,11 +154,14 @@ export function AdminDashboard({ password, apiEndpoint = '/api/admin/sessions' }
       </div>
 
       {/* 콘텐츠 */}
-      <div className="max-w-[1400px] mx-auto p-6">
+      <div className="mx-auto p-6" style={{ maxWidth: '1600px' }}>
         {tab === 'conversations' && (
-          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] xl:grid-cols-[280px_1fr_300px] gap-4">
+          <div ref={containerRef} className="flex" style={{ userSelect: dragging.current ? 'none' : undefined }}>
             {/* 대화 목록 */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div
+              className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-shrink-0"
+              style={{ width: leftWidth }}
+            >
               <div className="px-4 py-3 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-700">
                   Conversations ({sessions.length})
@@ -111,8 +176,11 @@ export function AdminDashboard({ password, apiEndpoint = '/api/admin/sessions' }
               </div>
             </div>
 
-            {/* 대화 상세 */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {/* 좌측 리사이즈 핸들 */}
+            <ResizeHandle onMouseDown={(e) => handleMouseDown('left', e)} />
+
+            {/* 대화 상세 (가운데 - flex-1로 남은 공간 차지) */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-1" style={{ minWidth: MIN_CENTER }}>
               <div className="px-4 py-3 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-700">Detail</h2>
               </div>
@@ -127,8 +195,14 @@ export function AdminDashboard({ password, apiEndpoint = '/api/admin/sessions' }
               </div>
             </div>
 
+            {/* 우측 리사이즈 핸들 */}
+            <ResizeHandle onMouseDown={(e) => handleMouseDown('right', e)} />
+
             {/* 세션 정보 패널 */}
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div
+              className="bg-white rounded-xl border border-gray-200 overflow-hidden flex-shrink-0"
+              style={{ width: rightWidth }}
+            >
               <div className="px-4 py-3 border-b border-gray-100">
                 <h2 className="text-sm font-semibold text-gray-700">Session Info</h2>
               </div>

@@ -830,11 +830,33 @@ function UnansweredList({ sessions }) {
 
 // src/components/admin/AdminDashboard.tsx
 var import_jsx_runtime12 = require("react/jsx-runtime");
+var MIN_LEFT = 220;
+var MIN_CENTER = 300;
+var MIN_RIGHT = 240;
+function ResizeHandle({ onMouseDown }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+    "div",
+    {
+      onMouseDown,
+      className: "w-1.5 cursor-col-resize flex-shrink-0 group relative",
+      children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "absolute inset-y-0 -left-1 -right-1" }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "h-full w-0.5 mx-auto bg-gray-200 group-hover:bg-indigo-400 group-active:bg-indigo-600 transition-colors rounded-full" })
+      ]
+    }
+  );
+}
 function AdminDashboard({ password, apiEndpoint = "/api/admin/sessions" }) {
   const [sessions, setSessions] = (0, import_react5.useState)([]);
   const [selectedSession, setSelectedSession] = (0, import_react5.useState)(null);
   const [tab, setTab] = (0, import_react5.useState)("conversations");
   const [costStats, setCostStats] = (0, import_react5.useState)({ dailyCost: 0, monthlyCost: 0, dailySessions: 0 });
+  const containerRef = (0, import_react5.useRef)(null);
+  const [leftWidth, setLeftWidth] = (0, import_react5.useState)(280);
+  const [rightWidth, setRightWidth] = (0, import_react5.useState)(320);
+  const dragging = (0, import_react5.useRef)(null);
+  const dragStartX = (0, import_react5.useRef)(0);
+  const dragStartWidth = (0, import_react5.useRef)(0);
   const fetchSessions = (0, import_react5.useCallback)(
     async (filter) => {
       const url = filter ? `${apiEndpoint}?filter=${encodeURIComponent(filter)}` : apiEndpoint;
@@ -852,6 +874,37 @@ function AdminDashboard({ password, apiEndpoint = "/api/admin/sessions" }) {
   (0, import_react5.useEffect)(() => {
     fetchSessions();
   }, [fetchSessions]);
+  const handleMouseDown = (0, import_react5.useCallback)((side, e) => {
+    e.preventDefault();
+    dragging.current = side;
+    dragStartX.current = e.clientX;
+    dragStartWidth.current = side === "left" ? leftWidth : rightWidth;
+  }, [leftWidth, rightWidth]);
+  (0, import_react5.useEffect)(() => {
+    const handleMouseMove = (e) => {
+      if (!dragging.current || !containerRef.current) return;
+      const containerWidth = containerRef.current.offsetWidth;
+      const delta = e.clientX - dragStartX.current;
+      if (dragging.current === "left") {
+        const newLeft = Math.max(MIN_LEFT, dragStartWidth.current + delta);
+        const maxLeft = containerWidth - rightWidth - MIN_CENTER - 12;
+        setLeftWidth(Math.min(newLeft, maxLeft));
+      } else {
+        const newRight = Math.max(MIN_RIGHT, dragStartWidth.current - delta);
+        const maxRight = containerWidth - leftWidth - MIN_CENTER - 12;
+        setRightWidth(Math.min(newRight, maxRight));
+      }
+    };
+    const handleMouseUp = () => {
+      dragging.current = null;
+    };
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [leftWidth, rightWidth]);
   const tabs = [
     { key: "conversations", label: "Conversations" },
     { key: "unanswered", label: "Unanswered" },
@@ -889,31 +942,47 @@ function AdminDashboard({ password, apiEndpoint = "/api/admin/sessions" }) {
       },
       t.key
     )) }) }),
-    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "max-w-[1400px] mx-auto p-6", children: [
-      tab === "conversations" && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "grid grid-cols-1 lg:grid-cols-[280px_1fr] xl:grid-cols-[280px_1fr_300px] gap-4", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("h2", { className: "text-sm font-semibold text-gray-700", children: [
-            "Conversations (",
-            sessions.length,
-            ")"
-          ] }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "max-h-[calc(100vh-220px)] overflow-y-auto", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
-            ChatList,
-            {
-              sessions,
-              selectedId: (selectedSession == null ? void 0 : selectedSession.session_id) || null,
-              onSelect: setSelectedSession
-            }
-          ) })
-        ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "mx-auto p-6", style: { maxWidth: "1600px" }, children: [
+      tab === "conversations" && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { ref: containerRef, className: "flex", style: { userSelect: dragging.current ? "none" : void 0 }, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+          "div",
+          {
+            className: "bg-white rounded-xl border border-gray-200 overflow-hidden flex-shrink-0",
+            style: { width: leftWidth },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("h2", { className: "text-sm font-semibold text-gray-700", children: [
+                "Conversations (",
+                sessions.length,
+                ")"
+              ] }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "max-h-[calc(100vh-220px)] overflow-y-auto", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(
+                ChatList,
+                {
+                  sessions,
+                  selectedId: (selectedSession == null ? void 0 : selectedSession.session_id) || null,
+                  onSelect: setSelectedSession
+                }
+              ) })
+            ]
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ResizeHandle, { onMouseDown: (e) => handleMouseDown("left", e) }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden flex-1", style: { minWidth: MIN_CENTER }, children: [
           /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h2", { className: "text-sm font-semibold text-gray-700", children: "Detail" }) }),
           /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "max-h-[calc(100vh-220px)] overflow-y-auto", children: selectedSession ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ChatDetail, { session: selectedSession }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-gray-500 text-sm p-4", children: "Select a conversation to view details." }) })
         ] }),
-        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h2", { className: "text-sm font-semibold text-gray-700", children: "Session Info" }) }),
-          /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "max-h-[calc(100vh-220px)] overflow-y-auto", children: selectedSession ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(SessionInfo, { session: selectedSession }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-gray-500 text-sm p-4", children: "Select a conversation to view session info." }) })
-        ] })
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(ResizeHandle, { onMouseDown: (e) => handleMouseDown("right", e) }),
+        /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)(
+          "div",
+          {
+            className: "bg-white rounded-xl border border-gray-200 overflow-hidden flex-shrink-0",
+            style: { width: rightWidth },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "px-4 py-3 border-b border-gray-100", children: /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("h2", { className: "text-sm font-semibold text-gray-700", children: "Session Info" }) }),
+              /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("div", { className: "max-h-[calc(100vh-220px)] overflow-y-auto", children: selectedSession ? /* @__PURE__ */ (0, import_jsx_runtime12.jsx)(SessionInfo, { session: selectedSession }) : /* @__PURE__ */ (0, import_jsx_runtime12.jsx)("p", { className: "text-gray-500 text-sm p-4", children: "Select a conversation to view session info." }) })
+            ]
+          }
+        )
       ] }),
       tab === "unanswered" && /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "bg-white rounded-xl border border-gray-200 overflow-hidden", children: [
         /* @__PURE__ */ (0, import_jsx_runtime12.jsxs)("div", { className: "px-4 py-3 border-b border-gray-100", children: [
