@@ -20,7 +20,9 @@ export function createChatHandler(options?: ChatHandlerOptions) {
 
   async function POST(req: Request) {
     try {
-      const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+      const rawIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+      const ip = rawIp // 원본 IP (rate limiting용)
+      const anonymizedIp = anonymizeIp(rawIp) // 익명화 IP (세션 저장용)
 
       // 비용 안전장치 체크
       const budgetCheck = await checkBudget(config.cost_safety, ip)
@@ -66,8 +68,8 @@ export function createChatHandler(options?: ChatHandlerOptions) {
           sessionId = null
         } else {
           session = await getSession(sessionId)
-          // H-5: IP 바인딩 검증 — IP가 다르면 세션 무효화
-          if (session && session.metadata?.ip && session.metadata.ip !== ip) {
+          // H-5: IP 바인딩 검증 — 익명화 IP가 다르면 세션 무효화
+          if (session && session.metadata?.ip && session.metadata.ip !== anonymizedIp) {
             session = null
             sessionId = null
           }
@@ -80,7 +82,7 @@ export function createChatHandler(options?: ChatHandlerOptions) {
         const metadata: SessionMetadata = {
           page_url: clientMetadata?.page_url,
           referrer: clientMetadata?.referrer,
-          ip,
+          ip: anonymizedIp,
           user_agent: userAgent,
           device,
           browser,
@@ -243,6 +245,22 @@ function detectLanguage(text: string): Language {
     return 'ko'
   }
   return 'en'
+}
+
+function anonymizeIp(ip: string): string {
+  if (ip === 'unknown') return ip
+  // IPv4: 마지막 옥텟을 0으로 마스킹 (203.0.113.42 → 203.0.113.0)
+  if (ip.includes('.')) {
+    const parts = ip.split('.')
+    parts[parts.length - 1] = '0'
+    return parts.join('.')
+  }
+  // IPv6: 마지막 4그룹을 제거
+  if (ip.includes(':')) {
+    const parts = ip.split(':')
+    return parts.slice(0, 4).join(':') + '::0'
+  }
+  return ip
 }
 
 function parseUserAgent(ua: string): { device: string; browser: string; os: string } {

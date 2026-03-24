@@ -321,7 +321,9 @@ function createChatHandler(options) {
   async function POST(req) {
     var _a;
     try {
-      const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+      const rawIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+      const ip = rawIp;
+      const anonymizedIp = anonymizeIp(rawIp);
       const budgetCheck = await checkBudget(config.cost_safety, ip);
       if (!budgetCheck.allowed) {
         return Response.json(
@@ -355,7 +357,7 @@ function createChatHandler(options) {
           sessionId = null;
         } else {
           session = await getSession(sessionId);
-          if (session && ((_a = session.metadata) == null ? void 0 : _a.ip) && session.metadata.ip !== ip) {
+          if (session && ((_a = session.metadata) == null ? void 0 : _a.ip) && session.metadata.ip !== anonymizedIp) {
             session = null;
             sessionId = null;
           }
@@ -367,7 +369,7 @@ function createChatHandler(options) {
         const metadata = {
           page_url: clientMetadata == null ? void 0 : clientMetadata.page_url,
           referrer: clientMetadata == null ? void 0 : clientMetadata.referrer,
-          ip,
+          ip: anonymizedIp,
           user_agent: userAgent,
           device,
           browser,
@@ -497,6 +499,19 @@ function detectLanguage(text) {
   }
   return "en";
 }
+function anonymizeIp(ip) {
+  if (ip === "unknown") return ip;
+  if (ip.includes(".")) {
+    const parts = ip.split(".");
+    parts[parts.length - 1] = "0";
+    return parts.join(".");
+  }
+  if (ip.includes(":")) {
+    const parts = ip.split(":");
+    return parts.slice(0, 4).join(":") + "::0";
+  }
+  return ip;
+}
 function parseUserAgent(ua) {
   let device = "desktop";
   if (/tablet|ipad/i.test(ua)) device = "tablet";
@@ -536,12 +551,47 @@ function createConfigHandler(options) {
 }
 
 // src/api/admin-handler.ts
+import { timingSafeEqual } from "crypto";
+var adminAttempts = /* @__PURE__ */ new Map();
+var MAX_ADMIN_ATTEMPTS = 5;
+var ADMIN_LOCKOUT_MS = 15 * 60 * 1e3;
+function checkAdminAuth(req) {
+  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown";
+  const attempt = adminAttempts.get(ip);
+  if (attempt) {
+    if (Date.now() - attempt.firstAttempt > ADMIN_LOCKOUT_MS) {
+      adminAttempts.delete(ip);
+    } else if (attempt.count >= MAX_ADMIN_ATTEMPTS) {
+      return Response.json({ error: "too_many_attempts" }, { status: 429 });
+    }
+  }
+  const password = req.headers.get("x-admin-password") || "";
+  const expected = process.env.ADMIN_PASSWORD || "";
+  if (!password || !expected) {
+    recordFailedAttempt(ip);
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const passwordBuf = Buffer.from(password);
+  const expectedBuf = Buffer.from(expected);
+  if (passwordBuf.length !== expectedBuf.length || !timingSafeEqual(passwordBuf, expectedBuf)) {
+    recordFailedAttempt(ip);
+    return Response.json({ error: "unauthorized" }, { status: 401 });
+  }
+  adminAttempts.delete(ip);
+  return null;
+}
+function recordFailedAttempt(ip) {
+  const attempt = adminAttempts.get(ip);
+  if (attempt) {
+    attempt.count++;
+  } else {
+    adminAttempts.set(ip, { count: 1, firstAttempt: Date.now() });
+  }
+}
 function createAdminHandler() {
   async function GET(req) {
-    const password = req.headers.get("x-admin-password");
-    if (password !== process.env.ADMIN_PASSWORD) {
-      return Response.json({ error: "unauthorized" }, { status: 401 });
-    }
+    const authError = checkAdminAuth(req);
+    if (authError) return authError;
     const url = new URL(req.url);
     const filter = url.searchParams.get("filter");
     let sessions;
