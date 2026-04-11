@@ -167,6 +167,18 @@ cost_safety:
 9. init CLI
 ```
 
+## Developing this package locally
+
+이 레포를 clone해서 단독 Next.js 앱으로 `pnpm dev` 하려면 챗봇 설정 파일이 필요합니다. 레포에는 실제 `chatbot/` 폴더를 커밋하지 않으므로(혼동 방지 + 민감 데이터 차단), `templates/`의 예시를 복사해서 시작하세요:
+
+```bash
+mkdir -p chatbot
+cp templates/knowledge.example.md chatbot/knowledge.md
+cp templates/config.example.yaml  chatbot/config.yaml
+```
+
+`chatbot/`은 `.gitignore`에 포함되어 있어 실수로 커밋되지 않습니다. Consumer가 `npm install`로 이 패키지를 설치하면 `files: ["dist", "templates"]` 설정에 따라 `chatbot/`은 애초에 포함되지 않으며, consumer는 자신의 프로젝트 루트에 직접 `chatbot/`을 두고 사용합니다.
+
 ## License
 
 MIT

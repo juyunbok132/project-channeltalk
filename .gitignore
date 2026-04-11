@@ -36,6 +36,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# local dev chatbot content (copied from templates/ on demand)
+/chatbot/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
